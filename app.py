@@ -5,6 +5,11 @@ from ui.sidebar import render as render_sidebar
 from core.cache import df_manager
 from core.data_loader import load_data
 from ui.style import style_css
+from pathlib import Path
+
+BASE_DIR = Path(__file__).parent
+LOGO_PATH = BASE_DIR / "logo" / "NEXUS.jpeg"
+
 
 # === Initialisation du compteur global pour keys uniques des graphiques ===
 if 'plot_counter' not in st.session_state:
@@ -13,10 +18,11 @@ if 'plot_counter' not in st.session_state:
 # Configuration de la page
 st.set_page_config(
     page_title=f"{APP_TITLE} - {APP_SUBTITLE}",
-    page_icon="C:\\Users\\lenovo\\Desktop\\data_analytics_pro\\NEXUS.jpeg",
+    page_icon=LOGO_PATH,
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
 
 # Thème dynamique
 theme = st.session_state.get("theme", "dark")
@@ -46,7 +52,7 @@ df = st.session_state.df
 col1, col2 = st.columns([1, 5])
 with col1:
     try:
-        st.image("C:\\Users\\lenovo\\Desktop\\data_analytics_pro\\NEXUS.jpeg", width=120)
+        st.image(LOGO_PATH, width=120)
     except FileNotFoundError:
         st.markdown("### 📊")
 
