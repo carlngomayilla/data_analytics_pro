@@ -1,0 +1,13 @@
+streamlit
+streamlit-aggrid
+streamlit-authenticator
+altair # Viz modernes
+pandas
+dask[complete]
+plotly
+xgboost
+scikit-learn
+statsmodels
+weasyprint # PDF pro
+kaleido
+openpyxl
