@@ -1,10 +1,10 @@
-# config/settings.py
-# Toutes les configurations centrales (maximales)
+﻿# config/settings.py
+# Toutes les configurations centrales
 
 APP_TITLE = "Nexus Data Analytics Pro"
-APP_SUBTITLE = "Dashboard Interactif Ultra Moderne"
+APP_SUBTITLE = "Plateforme d'analyse decisionnelle"
 
-#DOMAINS_AVAILABLE = ["*", "Finance", "Marketing", "Ventes", "RH"]  # Domaines pour filtre
+# DOMAINS_AVAILABLE = ["*", "Finance", "Marketing", "Ventes", "RH"]
 
 SAMPLE_DATA_OPTIONS = {
     "Aucun": None,
@@ -14,7 +14,7 @@ SAMPLE_DATA_OPTIONS = {
 
 UPLOAD_FOLDER = "uploaded_data"
 DATA_EXAMPLE_FOLDER = "data_examples"
-MAX_FILE_SIZE_MB = 200  # Limite taille fichier
+MAX_FILE_SIZE_MB = 200
 
 DARK_THEME_CSS = """
 <style>
@@ -31,11 +31,12 @@ LIGHT_THEME_CSS = """
 </style>
 """
 
-# ML configs
+# ML configuration
 ML_TARGET_DEFAULT = None
 ML_THRESHOLD = 0.5
 
 # Messages
-WELCOME_MESSAGE = "Bienvenue ! Chargez vos données pour explorer."
-ERROR_MESSAGE = "Erreur : "
-SUCCESS_MESSAGE = "Succès : "
+WELCOME_MESSAGE = "Bienvenue. Chargez vos donnees pour commencer."
+ERROR_MESSAGE = "Erreur: "
+SUCCESS_MESSAGE = "Operation reussie: "
+
