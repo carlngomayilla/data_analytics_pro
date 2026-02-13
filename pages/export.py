@@ -8,7 +8,14 @@ import pandas as pd
 import plotly.express as px
 import plotly.io as pio
 import streamlit as st
-from weasyprint import HTML
+
+
+def _get_weasyprint_html():
+    try:
+        from weasyprint import HTML
+    except Exception as exc:
+        return None, exc
+    return HTML, None
 
 
 def generate_graph_images(df):
@@ -45,6 +52,10 @@ def generate_graph_images(df):
 
 
 def generate_pdf_report(df):
+    HTML, import_error = _get_weasyprint_html()
+    if HTML is None:
+        raise RuntimeError(f"WeasyPrint indisponible: {import_error}")
+
     images = generate_graph_images(df)
 
     html_content = f"""
@@ -108,16 +119,30 @@ def main(df):
     tab1, tab2 = st.tabs(["Rapport PDF", "Rapport Excel"])
 
     with tab1:
-        if st.button("Generer le rapport PDF"):
+        html_cls, weasyprint_error = _get_weasyprint_html()
+        pdf_enabled = html_cls is not None
+        if not pdf_enabled:
+            st.warning(
+                "Export PDF indisponible sur cet environnement (bibliotheques systeme manquantes). "
+                "L'export Excel reste disponible."
+            )
+            st.caption(f"Detail technique: {weasyprint_error}")
+
+        if st.button("Generer le rapport PDF", disabled=not pdf_enabled):
             with st.spinner("Generation du rapport PDF..."):
-                pdf = generate_pdf_report(df)
-            with open(pdf, "rb") as f:
-                st.download_button(
-                    "Telecharger le rapport PDF",
-                    f,
-                    file_name=os.path.basename(pdf),
-                    mime="application/pdf",
-                )
+                try:
+                    pdf = generate_pdf_report(df)
+                except Exception as exc:
+                    st.error(f"Echec de generation PDF: {exc}")
+                    pdf = None
+            if pdf:
+                with open(pdf, "rb") as f:
+                    st.download_button(
+                        "Telecharger le rapport PDF",
+                        f,
+                        file_name=os.path.basename(pdf),
+                        mime="application/pdf",
+                    )
 
     with tab2:
         if st.button("Generer le rapport Excel"):
