@@ -2,6 +2,7 @@
 import base64
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
 from config.settings import APP_SUBTITLE, APP_TITLE
@@ -45,6 +46,59 @@ def ensure_unique_dataframe_columns(df):
     out = df.copy()
     out.columns = new_cols
     return out, renamed
+
+
+def _safe_as_series(df: pd.DataFrame, col: str) -> pd.Series:
+    selected = df.loc[:, col]
+    if isinstance(selected, pd.DataFrame):
+        return selected.iloc[:, 0]
+    return selected
+
+
+def safe_compute_metric_by_dimension(
+    df: pd.DataFrame,
+    dimension_col: str,
+    metric_type: str,
+    measure_name: str,
+    target_col: str | None,
+    numerator_col: str | None,
+    denominator_col: str | None,
+) -> pd.DataFrame:
+    dim_series = _safe_as_series(df, dimension_col)
+    work = pd.DataFrame({"__dim__": dim_series}, index=df.index)
+
+    if metric_type == "Ratio":
+        work["__num__"] = pd.to_numeric(_safe_as_series(df, numerator_col), errors="coerce")
+        work["__den__"] = pd.to_numeric(_safe_as_series(df, denominator_col), errors="coerce")
+        grouped = work.groupby("__dim__", dropna=False)
+        numerator = grouped["__num__"].sum(min_count=1)
+        denominator = grouped["__den__"].sum(min_count=1)
+        values = numerator / denominator.replace(0, pd.NA)
+    else:
+        work["__val__"] = _safe_as_series(df, target_col)
+        if metric_type in {"Somme", "Moyenne", "Minimum", "Maximum"}:
+            work["__val__"] = pd.to_numeric(work["__val__"], errors="coerce")
+
+        grouped = work.groupby("__dim__", dropna=False)["__val__"]
+        if metric_type == "Somme":
+            values = grouped.sum(min_count=1)
+        elif metric_type == "Moyenne":
+            values = grouped.mean()
+        elif metric_type == "Minimum":
+            values = grouped.min()
+        elif metric_type == "Maximum":
+            values = grouped.max()
+        elif metric_type == "Nombre de valeurs":
+            values = grouped.count()
+        elif metric_type == "Nombre distinct":
+            values = grouped.nunique(dropna=True)
+        else:
+            return pd.DataFrame(columns=[dimension_col, measure_name])
+
+    result = values.reset_index(name=measure_name).rename(columns={"__dim__": dimension_col})
+    result[measure_name] = pd.to_numeric(result[measure_name], errors="coerce")
+    result[dimension_col] = result[dimension_col].astype("string").fillna("(Vide)")
+    return result
 
 
 def render_circular_logo(path: Path, size_px: int = 120) -> None:
@@ -172,9 +226,12 @@ elif selected_module == "Machine Learning":
 
     ml_main(df)
 elif selected_module == "Modelisation DAX":
-    from pages.dax import main as dax_main
+    import pages.dax as dax_module
 
-    dax_main(df)
+    # Defensive runtime patch: keeps DAX grouping safe even if an old module
+    # version is still loaded by the deployment cache.
+    dax_module._compute_metric_by_dimension = safe_compute_metric_by_dimension
+    dax_module.main(df)
 elif selected_module == "Recherche et edition":
     from pages.data_editor import main as data_editor_main
 
