@@ -34,6 +34,39 @@ def _measure_ref(name: str, fallback: str = "Mesure") -> str:
     return f"[{_sanitize_measure_name(name, fallback=fallback)}]"
 
 
+def _ensure_unique_columns(df: pd.DataFrame) -> tuple[pd.DataFrame, list[tuple[str, str]]]:
+    seen: dict[str, int] = {}
+    used: set[str] = set()
+    new_cols: list[str] = []
+    renames: list[tuple[str, str]] = []
+
+    for original in df.columns.tolist():
+        base = str(original)
+        count = seen.get(base, 0) + 1
+        seen[base] = count
+
+        if count == 1 and base not in used:
+            candidate = base
+        else:
+            suffix = count
+            candidate = f"{base}__{suffix}"
+            while candidate in used:
+                suffix += 1
+                candidate = f"{base}__{suffix}"
+
+        used.add(candidate)
+        new_cols.append(candidate)
+        if candidate != base:
+            renames.append((base, candidate))
+
+    if not renames and all(str(col) == col for col in df.columns.tolist()):
+        return df, []
+
+    out = df.copy()
+    out.columns = new_cols
+    return out, renames
+
+
 def _build_basic_measure(table_name: str, column_name: str, metric_type: str, measure_name: str) -> str:
     col_ref = _dax_col_ref(table_name, column_name)
     expressions = {
@@ -250,6 +283,202 @@ def _to_numeric(series: pd.Series) -> pd.Series:
     return pd.to_numeric(series, errors="coerce")
 
 
+def _as_series(df: pd.DataFrame, col: str) -> pd.Series:
+    selected = df.loc[:, col]
+    if isinstance(selected, pd.DataFrame):
+        # If source columns are duplicated, keep the first physical column.
+        return selected.iloc[:, 0]
+    return selected
+
+
+def _find_column_exact(columns: list[str], desired: str) -> str | None:
+    desired_norm = (desired or "").strip().lower()
+    if not desired_norm:
+        return None
+    for col in columns:
+        if str(col).strip().lower() == desired_norm:
+            return col
+    return None
+
+
+def _pick_column_by_keywords(columns: list[str], keywords: list[str]) -> str | None:
+    lowered = [(col, str(col).lower()) for col in columns]
+    for keyword in keywords:
+        key = keyword.lower()
+        for col, low in lowered:
+            if key in low:
+                return col
+    return None
+
+
+def _extract_script_measure_specs(snippets: list[str]) -> dict[str, dict]:
+    specs: dict[str, dict] = {}
+    for snippet in snippets:
+        parsed = _parse_supported_measure(_first_formula_line(snippet))
+        if parsed is None:
+            continue
+        specs[parsed["measure_name"]] = parsed
+    return specs
+
+
+def _default_powerbi_measure_specs(df: pd.DataFrame, table_name: str = "Data") -> dict[str, dict]:
+    all_cols = df.columns.tolist()
+    numeric_cols = df.select_dtypes(include="number").columns.tolist()
+    if not all_cols:
+        return {}
+
+    amount_col = _pick_column_by_keywords(
+        numeric_cols,
+        ["depense", "montant", "amount", "prix", "price", "cout", "cost", "valeur", "vente", "sales", "total"],
+    )
+    if amount_col is None and numeric_cols:
+        amount_col = numeric_cols[0]
+
+    count_col = _pick_column_by_keywords(all_cols, ["id", "numero", "num", "reference", "ref"])
+    if count_col is None:
+        count_col = amount_col if amount_col is not None else all_cols[0]
+
+    specs: dict[str, dict] = {}
+    if amount_col is not None:
+        specs["Total Dépenses"] = {
+            "measure_name": "Total Dépenses",
+            "metric_type": "Somme",
+            "target_col": amount_col,
+            "numerator_col": None,
+            "denominator_col": None,
+            "formula": _build_basic_measure(table_name, amount_col, "Somme", "Total Dépenses"),
+        }
+        specs["Panier Moyen"] = {
+            "measure_name": "Panier Moyen",
+            "metric_type": "Moyenne",
+            "target_col": amount_col,
+            "numerator_col": None,
+            "denominator_col": None,
+            "formula": _build_basic_measure(table_name, amount_col, "Moyenne", "Panier Moyen"),
+        }
+        specs["% du Total (tous services)"] = {
+            "measure_name": "% du Total (tous services)",
+            "metric_type": "Part du total",
+            "target_col": amount_col,
+            "numerator_col": None,
+            "denominator_col": None,
+            "formula": (
+                f"% du Total (tous services) = "
+                f"DIVIDE([Mesure], CALCULATE([Mesure], ALL({_dax_table_ref(table_name)})), 0)"
+            ),
+        }
+
+    specs["Nb Dépenses"] = {
+        "measure_name": "Nb Dépenses",
+        "metric_type": "Nombre de valeurs",
+        "target_col": count_col,
+        "numerator_col": None,
+        "denominator_col": None,
+        "formula": _build_basic_measure(table_name, count_col, "Nombre de valeurs", "Nb Dépenses"),
+    }
+    return specs
+
+
+def _build_time_drilldown_columns(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, str]]:
+    date_candidates = [col for col in df.columns if _looks_like_datetime(df[col])]
+    if not date_candidates:
+        return df, {}
+
+    base_col = date_candidates[0]
+    parsed = pd.to_datetime(df[base_col], errors="coerce")
+    if not parsed.notna().any():
+        return df, {}
+
+    enriched = df.copy()
+    enriched["__dax_year__"] = parsed.dt.year.astype("Int64")
+    enriched["__dax_month__"] = parsed.dt.to_period("M").astype("string")
+    enriched["__dax_day__"] = parsed.dt.date.astype("string")
+    return enriched, {"Année": "__dax_year__", "Mois": "__dax_month__", "Jour": "__dax_day__"}
+
+
+def _compute_powerbi_visual_df(
+    df: pd.DataFrame,
+    axis_col: str,
+    metric_spec: dict,
+    top_n: int | str,
+) -> pd.DataFrame:
+    metric_type = metric_spec["metric_type"]
+    measure_name = metric_spec["measure_name"]
+    target_col = metric_spec["target_col"]
+    numerator_col = metric_spec["numerator_col"]
+    denominator_col = metric_spec["denominator_col"]
+
+    if metric_type == "Part du total":
+        grouped = _compute_metric_by_dimension(
+            df=df,
+            dimension_col=axis_col,
+            metric_type="Somme",
+            measure_name=measure_name,
+            target_col=target_col,
+            numerator_col=None,
+            denominator_col=None,
+        )
+        total = _to_numeric(_as_series(df, target_col)).sum(min_count=1)
+        if pd.isna(total) or float(total) == 0.0:
+            grouped[measure_name] = 0.0
+        else:
+            grouped[measure_name] = (grouped[measure_name] / float(total)) * 100.0
+        result = grouped
+    else:
+        result = _compute_metric_by_dimension(
+            df=df,
+            dimension_col=axis_col,
+            metric_type=metric_type,
+            measure_name=measure_name,
+            target_col=target_col,
+            numerator_col=numerator_col,
+            denominator_col=denominator_col,
+        )
+
+    if result.empty:
+        return result
+
+    time_axes = {"__dax_year__", "__dax_month__", "__dax_day__"}
+    if axis_col in time_axes:
+        parsed_dates = pd.to_datetime(result[axis_col], errors="coerce")
+        if parsed_dates.notna().any():
+            result["_sort_time"] = parsed_dates
+            result = result.sort_values("_sort_time", ascending=True).drop(columns=["_sort_time"])
+        else:
+            result = result.sort_values(axis_col, ascending=True)
+    else:
+        result = result.sort_values(measure_name, ascending=False)
+
+    if top_n != "Tous" and axis_col not in time_axes:
+        result = result.head(int(top_n))
+
+    return result
+
+
+def _compute_metric_from_spec(df: pd.DataFrame, metric_spec: dict) -> float:
+    metric_type = metric_spec["metric_type"]
+    target_col = metric_spec["target_col"]
+    numerator_col = metric_spec["numerator_col"]
+    denominator_col = metric_spec["denominator_col"]
+
+    if metric_type == "Part du total":
+        return _compute_metric_global(
+            df=df,
+            metric_type="Somme",
+            target_col=target_col,
+            numerator_col=None,
+            denominator_col=None,
+        )
+
+    return _compute_metric_global(
+        df=df,
+        metric_type=metric_type,
+        target_col=target_col,
+        numerator_col=numerator_col,
+        denominator_col=denominator_col,
+    )
+
+
 def _compute_metric_global(
     df: pd.DataFrame,
     metric_type: str,
@@ -258,24 +487,24 @@ def _compute_metric_global(
     denominator_col: str | None,
 ) -> float:
     if metric_type == "Ratio":
-        numerator = _to_numeric(df[numerator_col]).sum()
-        denominator = _to_numeric(df[denominator_col]).sum()
+        numerator = _to_numeric(_as_series(df, numerator_col)).sum()
+        denominator = _to_numeric(_as_series(df, denominator_col)).sum()
         if pd.isna(denominator) or float(denominator) == 0.0:
             return 0.0
         return float(numerator / denominator)
 
     if metric_type == "Somme":
-        return float(_to_numeric(df[target_col]).sum())
+        return float(_to_numeric(_as_series(df, target_col)).sum())
     if metric_type == "Moyenne":
-        return float(_to_numeric(df[target_col]).mean())
+        return float(_to_numeric(_as_series(df, target_col)).mean())
     if metric_type == "Minimum":
-        return float(_to_numeric(df[target_col]).min())
+        return float(_to_numeric(_as_series(df, target_col)).min())
     if metric_type == "Maximum":
-        return float(_to_numeric(df[target_col]).max())
+        return float(_to_numeric(_as_series(df, target_col)).max())
     if metric_type == "Nombre de valeurs":
-        return float(df[target_col].count())
+        return float(_as_series(df, target_col).count())
     if metric_type == "Nombre distinct":
-        return float(df[target_col].nunique(dropna=True))
+        return float(_as_series(df, target_col).nunique(dropna=True))
 
     return float("nan")
 
@@ -289,42 +518,36 @@ def _compute_metric_by_dimension(
     numerator_col: str | None,
     denominator_col: str | None,
 ) -> pd.DataFrame:
+    dim_series = _as_series(df, dimension_col)
+    dim_series = dim_series.rename(dimension_col)
+
     if metric_type == "Ratio":
-        working_df = df[[dimension_col, numerator_col, denominator_col]].copy()
-        working_df[numerator_col] = _to_numeric(working_df[numerator_col])
-        working_df[denominator_col] = _to_numeric(working_df[denominator_col])
-        grouped = working_df.groupby(dimension_col, dropna=False)
-        numerator = grouped[numerator_col].sum(min_count=1)
-        denominator = grouped[denominator_col].sum(min_count=1)
+        numerator_series = _to_numeric(_as_series(df, numerator_col))
+        denominator_series = _to_numeric(_as_series(df, denominator_col))
+        numerator = numerator_series.groupby(dim_series, dropna=False).sum(min_count=1)
+        denominator = denominator_series.groupby(dim_series, dropna=False).sum(min_count=1)
         values = numerator / denominator.replace(0, pd.NA)
     else:
-        working_df = df[[dimension_col, target_col]].copy()
-        grouped = working_df.groupby(dimension_col, dropna=False)
+        target_series = _as_series(df, target_col)
 
         if metric_type == "Somme":
-            working_df[target_col] = _to_numeric(working_df[target_col])
-            grouped = working_df.groupby(dimension_col, dropna=False)
-            values = grouped[target_col].sum(min_count=1)
+            values = _to_numeric(target_series).groupby(dim_series, dropna=False).sum(min_count=1)
         elif metric_type == "Moyenne":
-            working_df[target_col] = _to_numeric(working_df[target_col])
-            grouped = working_df.groupby(dimension_col, dropna=False)
-            values = grouped[target_col].mean()
+            values = _to_numeric(target_series).groupby(dim_series, dropna=False).mean()
         elif metric_type == "Minimum":
-            working_df[target_col] = _to_numeric(working_df[target_col])
-            grouped = working_df.groupby(dimension_col, dropna=False)
-            values = grouped[target_col].min()
+            values = _to_numeric(target_series).groupby(dim_series, dropna=False).min()
         elif metric_type == "Maximum":
-            working_df[target_col] = _to_numeric(working_df[target_col])
-            grouped = working_df.groupby(dimension_col, dropna=False)
-            values = grouped[target_col].max()
+            values = _to_numeric(target_series).groupby(dim_series, dropna=False).max()
         elif metric_type == "Nombre de valeurs":
-            values = grouped[target_col].count()
+            values = target_series.groupby(dim_series, dropna=False).count()
         elif metric_type == "Nombre distinct":
-            values = grouped[target_col].nunique(dropna=True)
+            values = target_series.groupby(dim_series, dropna=False).nunique(dropna=True)
         else:
             values = pd.Series(dtype="float64")
 
     result = values.reset_index(name=measure_name)
+    if result.columns[0] != dimension_col:
+        result = result.rename(columns={result.columns[0]: dimension_col})
     result[measure_name] = pd.to_numeric(result[measure_name], errors="coerce")
 
     raw_dim = result[dimension_col]
@@ -513,6 +736,18 @@ def main(df: pd.DataFrame) -> None:
         st.info("Chargez un fichier pour activer la generation DAX.")
         return
 
+    df, renamed_cols = _ensure_unique_columns(df)
+    if renamed_cols:
+        preview_pairs = [f"`{old}` -> `{new}`" for old, new in renamed_cols[:6]]
+        preview_text = ", ".join(preview_pairs)
+        if len(renamed_cols) > 6:
+            preview_text += f", ... (+{len(renamed_cols) - 6})"
+        st.warning(
+            "Colonnes dupliquees detectees. "
+            "Pour eviter les erreurs de groupement, cette page utilise des noms uniques: "
+            f"{preview_text}"
+        )
+
     numeric_cols = df.select_dtypes(include="number").columns.tolist()
     all_cols = df.columns.tolist()
     date_cols = [col for col in all_cols if _looks_like_datetime(df[col])]
@@ -676,202 +911,210 @@ def main(df: pd.DataFrame) -> None:
             st.info("Aucune colonne de date detectee pour la comparaison avec l'annee precedente.")
 
     with tab_visual:
-        st.subheader("Visualisation des scripts DAX")
-        st.write("Visualisez vos formules DAX dans l'application avec des filtres interactifs type Power BI.")
+        st.subheader("Power BI-like : Mesures + Visuels")
 
-        source_mode = st.radio(
-            "Source de la mesure",
-            ["Utiliser une mesure du script DAX", "Construire une mesure"],
-            horizontal=True,
-        )
-
-        metric_type = None
-        target_col = None
-        numerator_col = None
-        denominator_col = None
-        measure_name = "Mesure"
-        formula = ""
-
-        if source_mode == "Construire une mesure":
-            metric_type = st.selectbox(
-                "Type de mesure du visuel",
-                ["Somme", "Moyenne", "Minimum", "Maximum", "Nombre de valeurs", "Nombre distinct", "Ratio"],
-                key="dax_visual_metric_type",
-            )
-
-            if metric_type == "Ratio":
-                if not numeric_cols:
-                    st.info("Ajoutez des colonnes numeriques pour visualiser un ratio.")
-                else:
-                    numerator_col = st.selectbox("Numerateur", numeric_cols, key="dax_visual_num")
-                    denominator_col = st.selectbox("Denominateur", numeric_cols, key="dax_visual_den")
-                    measure_name = st.text_input("Nom de la mesure", value=f"Taux {numerator_col}", key="dax_visual_name_ratio")
-                    formula = _build_ratio_measure(table_name, numerator_col, denominator_col, measure_name)
-            else:
-                candidate_cols = all_cols if metric_type in {"Nombre de valeurs", "Nombre distinct"} else numeric_cols
-                if not candidate_cols:
-                    st.info("Aucune colonne compatible pour ce type de mesure.")
-                else:
-                    target_col = st.selectbox("Colonne cible", candidate_cols, key="dax_visual_target")
-                    measure_name = st.text_input(
-                        "Nom de la mesure",
-                        value=f"{metric_type} {target_col}",
-                        key="dax_visual_name_basic",
-                    )
-                    formula = _build_basic_measure(table_name, target_col, metric_type, measure_name)
-
-            if formula:
-                st.code(formula, language="sql")
-                if st.button("Ajouter cette mesure au script", key="add_visual_formula"):
-                    _store_snippet(formula)
-                    st.success("La mesure a ete ajoutee au script DAX.")
-
-        else:
-            if not st.session_state.dax_snippets:
-                st.info("Aucune mesure disponible dans le script DAX. Ajoutez d'abord des mesures.")
-            else:
-                selected_index = st.selectbox(
-                    "Mesure a visualiser",
-                    options=list(range(len(st.session_state.dax_snippets))),
-                    format_func=lambda i: f"{i + 1}. {_first_formula_line(st.session_state.dax_snippets[i])[:100]}",
-                    key="dax_visual_existing_measure",
-                )
-                selected_snippet = st.session_state.dax_snippets[selected_index]
-                first_line = _first_formula_line(selected_snippet)
-                parsed = _parse_supported_measure(first_line)
-
-                st.code(selected_snippet, language="sql")
-                if parsed is None:
-                    st.warning(
-                        "Cette mesure n'est pas compatible avec la previsualisation automatique. "
-                        "Expressions prises en charge: SUM, AVERAGE, MIN, MAX, COUNT, DISTINCTCOUNT, DIVIDE(SUM,SUM)."
-                    )
-                else:
-                    metric_type = parsed["metric_type"]
-                    target_col = parsed["target_col"]
-                    numerator_col = parsed["numerator_col"]
-                    denominator_col = parsed["denominator_col"]
-                    measure_name = parsed["measure_name"]
-                    formula = parsed["formula"]
-                    st.caption("Previsualisation basee sur la premiere formule de la mesure selectionnee.")
+        measure_catalog = {
+            "Finance": ["Total Dépenses", "Panier Moyen", "% du Total (tous services)"],
+            "Volume": ["Nb Dépenses"],
+        }
 
         filtered_df = _apply_slicer_filters(df, prefix="dax_visual_filter")
-
         if filtered_df.empty:
             st.warning("Aucune ligne ne correspond aux filtres actifs. Ajustez les slicers.")
-        elif metric_type is None:
-            st.info("Configurez d'abord une mesure pour afficher une visualisation.")
         else:
-            validation_error = _validate_metric_spec(filtered_df, metric_type, target_col, numerator_col, denominator_col)
-            if validation_error:
-                st.warning(validation_error)
+            default_specs = _default_powerbi_measure_specs(filtered_df, table_name=table_name)
+            script_specs = _extract_script_measure_specs(st.session_state.dax_snippets)
+            measure_specs = {**default_specs, **script_specs}
+
+            if not measure_specs:
+                st.info("Aucune mesure exploitable. Ajoutez des mesures ou chargez des colonnes numeriques.")
             else:
-                st.caption(f"Base utilisee pour le calcul: {len(filtered_df):,} lignes apres filtrage.")
+                all_measures = [m for grp in measure_catalog.values() for m in grp if m in measure_specs]
+                if not all_measures:
+                    all_measures = list(measure_specs.keys())
 
-                dimension_choice = st.selectbox(
-                    "Dimension du visuel",
-                    ["(Aucune - indicateur global)"] + all_cols,
-                    key="dax_visual_dimension",
-                )
-                dimension_col = None if dimension_choice.startswith("(Aucune") else dimension_choice
+                colA, colB, colC, colD = st.columns([1.2, 1.2, 1, 1])
 
-                chart_type = None
-                top_n = 20
-                if dimension_col is not None:
-                    chart_type = st.selectbox(
-                        "Type de graphique",
-                        ["Barres", "Ligne", "Aire", "Camembert"],
-                        key="dax_visual_chart_type",
+                with colA:
+                    measure_group = st.selectbox(
+                        "Groupe de mesures",
+                        list(measure_catalog.keys()),
+                        index=0,
+                        key="dax_pbi_group",
                     )
-                    top_n = st.slider("Top N lignes", min_value=3, max_value=100, value=20, key="dax_visual_top_n")
-
-                st.markdown("### Resultats")
-
-                export_df = pd.DataFrame()
-                fig = None
-
-                if dimension_col is None:
-                    metric_value = _compute_metric_global(
-                        filtered_df, metric_type, target_col, numerator_col, denominator_col
+                with colB:
+                    measures_in_group = [m for m in measure_catalog.get(measure_group, []) if m in measure_specs]
+                    if not measures_in_group:
+                        measures_in_group = all_measures
+                    selected_measure = st.selectbox(
+                        "Mesure",
+                        measures_in_group,
+                        index=0,
+                        key="dax_pbi_measure",
                     )
-                    st.metric(measure_name, _format_metric_value(metric_value))
-                    export_df = pd.DataFrame({"Mesure": [measure_name], "Valeur": [metric_value]})
+                with colC:
+                    chart_type = st.selectbox("Visuel", ["Bar", "Line", "Area", "Pie"], index=0, key="dax_pbi_chart")
+                with colD:
+                    top_n = st.selectbox("Top N", [5, 10, 15, 20, "Tous"], index=1, key="dax_pbi_topn")
+
+                visual_source_df, time_level_map = _build_time_drilldown_columns(filtered_df)
+
+                dim_choices = []
+                dim_map: dict[str, str] = {}
+
+                for preferred in ["service", "direction", "type"]:
+                    found = _find_column_exact(visual_source_df.columns.tolist(), preferred)
+                    if found is not None:
+                        dim_choices.append(found)
+                        dim_map[found] = found
+
+                if not dim_choices:
+                    fallback_dims = [c for c in visual_source_df.columns.tolist() if not str(c).startswith("__dax_")]
+                    fallback_dims = fallback_dims[: min(6, len(fallback_dims))]
+                    dim_choices = fallback_dims
+                    dim_map.update({col: col for col in fallback_dims})
+
+                if time_level_map:
+                    dim_choices.append("Temps (drilldown)")
+                    dim_map["Temps (drilldown)"] = "__time__"
+
+                if not dim_choices:
+                    st.warning("Aucune dimension disponible pour construire un visuel.")
                 else:
-                    grouped_df = _compute_metric_by_dimension(
-                        df=filtered_df,
-                        dimension_col=dimension_col,
-                        metric_type=metric_type,
-                        measure_name=measure_name,
-                        target_col=target_col,
-                        numerator_col=numerator_col,
-                        denominator_col=denominator_col,
-                    )
-                    if grouped_df.empty:
-                        st.info("Aucune donnee exploitable pour cette visualisation.")
+                    dim_choice = st.selectbox("Axe (dimension)", dim_choices, index=0, key="dax_pbi_dimension")
+
+                    if dim_choice == "Temps (drilldown)":
+                        time_level = st.radio(
+                            "Niveau temps",
+                            ["Année", "Mois", "Jour"],
+                            horizontal=True,
+                            key="dax_pbi_time_level",
+                        )
+                        dim_col = time_level_map.get(time_level)
                     else:
-                        visual_df = _prepare_visual_dataframe(grouped_df, dimension_col, measure_name, chart_type, top_n)
-                        st.dataframe(visual_df, use_container_width=True)
-                        fig = _build_visual_figure(visual_df, dimension_col, measure_name, chart_type)
-                        if fig is not None:
-                            st.plotly_chart(fig, use_container_width=True)
-                        export_df = visual_df
+                        dim_col = dim_map[dim_choice]
 
-                if not export_df.empty:
-                    st.markdown("### Export des resultats")
-                    base_name = _safe_filename(f"{measure_name}_visual")
+                    metric_spec = measure_specs[selected_measure]
+                    metric_type = metric_spec["metric_type"]
+                    target_col = metric_spec["target_col"]
+                    numerator_col = metric_spec["numerator_col"]
+                    denominator_col = metric_spec["denominator_col"]
 
-                    csv_bytes = export_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-                    excel_bytes = _to_excel_bytes(export_df)
+                    validation_error = _validate_metric_spec(
+                        visual_source_df,
+                        "Somme" if metric_type == "Part du total" else metric_type,
+                        target_col,
+                        numerator_col,
+                        denominator_col,
+                    )
+                    if validation_error:
+                        st.warning(validation_error)
+                    else:
+                        st.code(metric_spec["formula"], language="sql")
+                        st.caption(f"Base utilisee pour le calcul: {len(visual_source_df):,} lignes apres filtrage.")
 
-                    col_csv, col_xlsx, col_html, col_png = st.columns(4)
-                    with col_csv:
-                        st.download_button(
-                            "Exporter CSV",
-                            data=csv_bytes,
-                            file_name=f"{base_name}.csv",
-                            mime="text/csv",
+                        vis_df = _compute_powerbi_visual_df(
+                            df=visual_source_df,
+                            axis_col=dim_col,
+                            metric_spec=metric_spec,
+                            top_n=top_n,
                         )
 
-                    with col_xlsx:
-                        st.download_button(
-                            "Exporter Excel",
-                            data=excel_bytes,
-                            file_name=f"{base_name}.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        )
-
-                    with col_html:
-                        if fig is not None:
-                            html_bytes = fig.to_html(include_plotlyjs="cdn", full_html=True).encode("utf-8")
-                            st.download_button(
-                                "Exporter HTML",
-                                data=html_bytes,
-                                file_name=f"{base_name}.html",
-                                mime="text/html",
-                            )
+                        if vis_df.empty:
+                            st.warning("Aucune donnee pour ce visuel avec les filtres actuels.")
                         else:
-                            st.download_button(
-                                "Exporter TXT",
-                                data=f"{measure_name} = {export_df.iloc[0]['Valeur']}\n\n{formula}".encode("utf-8"),
-                                file_name=f"{base_name}.txt",
-                                mime="text/plain",
-                            )
+                            axis_label = dim_col
+                            display_df = vis_df.copy()
+                            if dim_col == "__dax_year__":
+                                axis_label = "year"
+                                display_df = display_df.rename(columns={dim_col: axis_label})
+                            elif dim_col == "__dax_month__":
+                                axis_label = "month"
+                                display_df = display_df.rename(columns={dim_col: axis_label})
+                            elif dim_col == "__dax_day__":
+                                axis_label = "date"
+                                display_df = display_df.rename(columns={dim_col: axis_label})
 
-                    with col_png:
-                        if fig is not None:
-                            png_bytes, png_error = _figure_to_png_bytes(fig)
-                            if png_bytes is not None:
-                                st.download_button(
-                                    "Exporter l'image PNG",
-                                    data=png_bytes,
-                                    file_name=f"{base_name}.png",
-                                    mime="image/png",
-                                )
+                            measure_col = metric_spec["measure_name"]
+                            st.dataframe(display_df, use_container_width=True)
+
+                            title = f"{selected_measure} par {axis_label}"
+                            if chart_type == "Bar":
+                                fig = px.bar(display_df, x=axis_label, y=measure_col, title=title)
+                            elif chart_type == "Line":
+                                fig = px.line(display_df, x=axis_label, y=measure_col, markers=True, title=title)
+                            elif chart_type == "Area":
+                                fig = px.area(display_df, x=axis_label, y=measure_col, title=title)
                             else:
-                                st.caption("PNG indisponible sur cet environnement.")
-                                st.caption(png_error[:140])
-                        else:
-                            st.write("")
+                                fig = px.pie(display_df, names=axis_label, values=measure_col, title=title)
+
+                            st.plotly_chart(fig, use_container_width=True)
+
+                            st.markdown("### Filtre par selection (Power BI-like)")
+                            axis_values = list(dict.fromkeys(display_df[axis_label].astype(str).tolist()))
+                            selected_axis_value = st.selectbox(
+                                f"Appliquer un filtre sur {axis_label}",
+                                options=["(aucun)"] + axis_values,
+                                key="dax_pbi_axis_filter",
+                            )
+
+                            if selected_axis_value != "(aucun)":
+                                axis_series = visual_source_df[dim_col].astype("string").fillna("(Vide)")
+                                selected_df = visual_source_df[axis_series == str(selected_axis_value)]
+
+                                st.markdown("#### KPIs sous selection")
+                                k1, k2, k3 = st.columns(3)
+                                for col, kpi_name in zip(
+                                    [k1, k2, k3],
+                                    ["Total Dépenses", "Nb Dépenses", "Panier Moyen"],
+                                ):
+                                    kpi_spec = measure_specs.get(kpi_name)
+                                    if kpi_spec is None:
+                                        col.metric(kpi_name, "N/A")
+                                    else:
+                                        kpi_value = _compute_metric_from_spec(selected_df, kpi_spec)
+                                        col.metric(kpi_name, _format_metric_value(kpi_value))
+
+                            st.markdown("### Export des resultats")
+                            base_name = _safe_filename(f"{selected_measure}_visual")
+                            csv_bytes = display_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+                            excel_bytes = _to_excel_bytes(display_df)
+                            html_bytes = fig.to_html(include_plotlyjs="cdn", full_html=True).encode("utf-8")
+                            png_bytes, png_error = _figure_to_png_bytes(fig)
+
+                            col_csv, col_xlsx, col_html, col_png = st.columns(4)
+                            with col_csv:
+                                st.download_button(
+                                    "Exporter CSV",
+                                    data=csv_bytes,
+                                    file_name=f"{base_name}.csv",
+                                    mime="text/csv",
+                                )
+                            with col_xlsx:
+                                st.download_button(
+                                    "Exporter Excel",
+                                    data=excel_bytes,
+                                    file_name=f"{base_name}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                )
+                            with col_html:
+                                st.download_button(
+                                    "Exporter HTML",
+                                    data=html_bytes,
+                                    file_name=f"{base_name}.html",
+                                    mime="text/html",
+                                )
+                            with col_png:
+                                if png_bytes is not None:
+                                    st.download_button(
+                                        "Exporter l'image PNG",
+                                        data=png_bytes,
+                                        file_name=f"{base_name}.png",
+                                        mime="image/png",
+                                    )
+                                else:
+                                    st.caption("PNG indisponible sur cet environnement.")
+                                    st.caption(png_error[:140])
 
     with tab_script:
         st.write("Assemblez vos mesures puis exportez-les dans un fichier unique.")
