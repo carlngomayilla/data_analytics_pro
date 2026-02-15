@@ -519,39 +519,39 @@ def _compute_metric_by_dimension(
     denominator_col: str | None,
 ) -> pd.DataFrame:
     dim_series = _as_series(df, dimension_col)
-    dim_series = dim_series.rename(dimension_col)
+    work = pd.DataFrame({"__dim__": dim_series}, index=df.index)
 
     if metric_type == "Ratio":
-        numerator_series = _to_numeric(_as_series(df, numerator_col))
-        denominator_series = _to_numeric(_as_series(df, denominator_col))
-        numerator = numerator_series.groupby(dim_series, dropna=False).sum(min_count=1)
-        denominator = denominator_series.groupby(dim_series, dropna=False).sum(min_count=1)
+        work["__num__"] = _to_numeric(_as_series(df, numerator_col))
+        work["__den__"] = _to_numeric(_as_series(df, denominator_col))
+        grouped = work.groupby("__dim__", dropna=False)
+        numerator = grouped["__num__"].sum(min_count=1)
+        denominator = grouped["__den__"].sum(min_count=1)
         values = numerator / denominator.replace(0, pd.NA)
     else:
-        target_series = _as_series(df, target_col)
+        work["__val__"] = _as_series(df, target_col)
+        if metric_type in {"Somme", "Moyenne", "Minimum", "Maximum"}:
+            work["__val__"] = pd.to_numeric(work["__val__"], errors="coerce")
 
+        grouped = work.groupby("__dim__", dropna=False)["__val__"]
         if metric_type == "Somme":
-            values = _to_numeric(target_series).groupby(dim_series, dropna=False).sum(min_count=1)
+            values = grouped.sum(min_count=1)
         elif metric_type == "Moyenne":
-            values = _to_numeric(target_series).groupby(dim_series, dropna=False).mean()
+            values = grouped.mean()
         elif metric_type == "Minimum":
-            values = _to_numeric(target_series).groupby(dim_series, dropna=False).min()
+            values = grouped.min()
         elif metric_type == "Maximum":
-            values = _to_numeric(target_series).groupby(dim_series, dropna=False).max()
+            values = grouped.max()
         elif metric_type == "Nombre de valeurs":
-            values = target_series.groupby(dim_series, dropna=False).count()
+            values = grouped.count()
         elif metric_type == "Nombre distinct":
-            values = target_series.groupby(dim_series, dropna=False).nunique(dropna=True)
+            values = grouped.nunique(dropna=True)
         else:
-            values = pd.Series(dtype="float64")
+            return pd.DataFrame(columns=[dimension_col, measure_name])
 
-    result = values.reset_index(name=measure_name)
-    if result.columns[0] != dimension_col:
-        result = result.rename(columns={result.columns[0]: dimension_col})
+    result = values.reset_index(name=measure_name).rename(columns={"__dim__": dimension_col})
     result[measure_name] = pd.to_numeric(result[measure_name], errors="coerce")
-
-    raw_dim = result[dimension_col]
-    result[dimension_col] = raw_dim.astype("string").fillna("(Vide)")
+    result[dimension_col] = result[dimension_col].astype("string").fillna("(Vide)")
     return result
 
 
