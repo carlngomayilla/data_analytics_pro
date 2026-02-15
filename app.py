@@ -101,13 +101,14 @@ if df is None:
     st.stop()
 
 # Onglets principaux
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
     [
         "Tableau de bord",
         "Analyses",
         "Preparation des donnees",
         "Machine Learning",
         "Modelisation DAX",
+        "Recherche et edition",
         "Rapports et exports",
     ]
 )
@@ -138,6 +139,11 @@ with tab5:
     dax_main(df)
 
 with tab6:
+    from pages.data_editor import main as data_editor_main
+
+    data_editor_main(df)
+
+with tab7:
     from pages.export import main as export_main
 
     export_main(df)
