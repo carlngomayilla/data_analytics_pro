@@ -14,6 +14,39 @@ BASE_DIR = Path(__file__).parent
 LOGO_PATH = BASE_DIR / "logo" / "NEXUS.jpeg"
 
 
+def ensure_unique_dataframe_columns(df):
+    seen = {}
+    used = set()
+    new_cols = []
+    renamed = []
+
+    for original in df.columns.tolist():
+        base = str(original)
+        count = seen.get(base, 0) + 1
+        seen[base] = count
+
+        if count == 1 and base not in used:
+            candidate = base
+        else:
+            suffix = count
+            candidate = f"{base}__{suffix}"
+            while candidate in used:
+                suffix += 1
+                candidate = f"{base}__{suffix}"
+
+        used.add(candidate)
+        new_cols.append(candidate)
+        if candidate != base:
+            renamed.append((base, candidate))
+
+    if not renamed and all(str(col) == col for col in df.columns.tolist()):
+        return df, []
+
+    out = df.copy()
+    out.columns = new_cols
+    return out, renamed
+
+
 def render_circular_logo(path: Path, size_px: int = 120) -> None:
     if not path.exists():
         raise FileNotFoundError
@@ -76,11 +109,21 @@ if uploaded_file is not None:
 
         raw_df = load_cached(uploaded_file)
         if raw_df is not None:
-            st.session_state.df = df_manager(raw_df)
+            normalized_df, renamed_cols = ensure_unique_dataframe_columns(raw_df)
+            st.session_state.df = df_manager(normalized_df)
             st.success(
                 f"Fichier {uploaded_file.name} charge avec succes "
                 f"({len(raw_df):,} lignes x {len(raw_df.columns)} colonnes)."
             )
+            if renamed_cols:
+                preview = ", ".join(f"`{old}` -> `{new}`" for old, new in renamed_cols[:6])
+                if len(renamed_cols) > 6:
+                    preview += f", ... (+{len(renamed_cols) - 6})"
+                st.warning(
+                    "Colonnes dupliquees detectees dans le fichier source. "
+                    "Des noms uniques ont ete appliques pour eviter les erreurs de calcul: "
+                    f"{preview}"
+                )
 
 df = st.session_state.df
 
