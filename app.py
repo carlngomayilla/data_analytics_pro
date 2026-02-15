@@ -100,50 +100,43 @@ if df is None:
     st.info("Utilisez la barre laterale pour charger un fichier et demarrer l'analyse.")
     st.stop()
 
-# Onglets principaux
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
-    [
-        "Tableau de bord",
-        "Analyses",
-        "Preparation des donnees",
-        "Machine Learning",
-        "Modelisation DAX",
-        "Recherche et edition",
-        "Rapports et exports",
-    ]
-)
+# Navigation principale (selecteur unique pour eviter le masquage des onglets)
+module_options = [
+    "Tableau de bord",
+    "Analyses",
+    "Preparation des donnees",
+    "Machine Learning",
+    "Modelisation DAX",
+    "Recherche et edition",
+    "Rapports et exports",
+]
+selected_module = st.selectbox("Module", module_options, index=0, key="main_module_select")
 
-with tab1:
+if selected_module == "Tableau de bord":
     from pages.dashboard import main as dashboard_main
 
     dashboard_main(df)
-
-with tab2:
+elif selected_module == "Analyses":
     from pages.analyse import main as analyse_main
 
     analyse_main(df)
-
-with tab3:
+elif selected_module == "Preparation des donnees":
     from pages.cleaning import main as cleaning_main
 
     cleaning_main(df)
-
-with tab4:
+elif selected_module == "Machine Learning":
     from pages.ml import main as ml_main
 
     ml_main(df)
-
-with tab5:
+elif selected_module == "Modelisation DAX":
     from pages.dax import main as dax_main
 
     dax_main(df)
-
-with tab6:
+elif selected_module == "Recherche et edition":
     from pages.data_editor import main as data_editor_main
 
     data_editor_main(df)
-
-with tab7:
+else:
     from pages.export import main as export_main
 
     export_main(df)
