@@ -1,4 +1,4 @@
-﻿# core/ml_engine.py
+# core/ml_engine.py
 import streamlit as st
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import accuracy_score, mean_squared_error
@@ -41,4 +41,5 @@ def run_ml(df, target):
     if is_classification:
         proba = model.predict_proba(X_test)[:, 1]
         st.write(f"Predictions positives au seuil {ML_THRESHOLD}: {sum(proba > ML_THRESHOLD)}")
+
 

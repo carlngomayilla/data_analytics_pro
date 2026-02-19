@@ -1,4 +1,4 @@
-﻿# pages/analyse.py
+# pages/analyse.py
 import pandas as pd
 import streamlit as st
 
@@ -24,13 +24,13 @@ from core.visualization import (
 # Interpretations automatiques
 def safe_dataframe_display(df):
     try:
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, width="stretch")
     except OverflowError:
         st.warning(
             "Certaines valeurs sont trop grandes pour l'affichage natif. "
             "Conversion en texte appliquee."
         )
-        st.dataframe(df.astype(str), use_container_width=True)
+        st.dataframe(df.astype(str), width="stretch")
 
 
 def interpret_distribution(df, col):
@@ -212,5 +212,7 @@ def main(df):
                 }
             )
             plot_waterfall_chart(waterfall_data["value"], waterfall_data["label"], dark_mode=dark_mode)
+
+
 
 

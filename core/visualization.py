@@ -1,4 +1,4 @@
-﻿# core/visualization.py
+# core/visualization.py
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -60,7 +60,7 @@ def plot_distribution(df, column, dark_mode=False):
         opacity=0.7,
     )
     fig.update_layout(bargap=0.1, height=600, **get_layout(dark_mode))
-    st.plotly_chart(fig, use_container_width=True, key=get_unique_key(f"dist_{column}"))
+    st.plotly_chart(fig, width="stretch", key=get_unique_key(f"dist_{column}"))
 
 
 def plot_box(df, column, by=None, dark_mode=False):
@@ -70,14 +70,14 @@ def plot_box(df, column, by=None, dark_mode=False):
     title = f"Boite a moustaches de {column}" + (f" par {by}" if by else "")
     fig = px.box(df, y=column, x=by, color=by, points="outliers", title=title)
     fig.update_layout(height=600, **get_layout(dark_mode))
-    st.plotly_chart(fig, use_container_width=True, key=get_unique_key(f"box_{column}_{by or 'none'}"))
+    st.plotly_chart(fig, width="stretch", key=get_unique_key(f"box_{column}_{by or 'none'}"))
 
 
 def plot_violin(df, column, by=None, dark_mode=False):
     title = f"Diagramme en violon de {column}" + (f" par {by}" if by else "")
     fig = px.violin(df, y=column, x=by, color=by, box=True, points="all", title=title)
     fig.update_layout(height=600, **get_layout(dark_mode))
-    st.plotly_chart(fig, use_container_width=True, key=get_unique_key(f"violin_{column}_{by or 'none'}"))
+    st.plotly_chart(fig, width="stretch", key=get_unique_key(f"violin_{column}_{by or 'none'}"))
 
 
 def plot_density(df, column, dark_mode=False):
@@ -93,7 +93,7 @@ def plot_density(df, column, dark_mode=False):
     title = f"Densite de {column}"
     fig = ff.create_distplot([data], [column], show_hist=False, show_rug=False)
     fig.update_layout(title=title, height=500, **get_layout(dark_mode))
-    st.plotly_chart(fig, use_container_width=True, key=get_unique_key(f"density_{column}"))
+    st.plotly_chart(fig, width="stretch", key=get_unique_key(f"density_{column}"))
 
 
 def plot_bar(df, column, top_n=15, dark_mode=False):
@@ -111,7 +111,7 @@ def plot_bar(df, column, top_n=15, dark_mode=False):
         color_continuous_scale="Viridis" if not dark_mode else "plasma",
     )
     fig.update_layout(height=600, **get_layout(dark_mode))
-    st.plotly_chart(fig, use_container_width=True, key=get_unique_key(f"bar_{column}"))
+    st.plotly_chart(fig, width="stretch", key=get_unique_key(f"bar_{column}"))
 
 
 def plot_pie(df, column, dark_mode=False):
@@ -122,7 +122,7 @@ def plot_pie(df, column, dark_mode=False):
     title = f"Repartition de {column}"
     fig = px.pie(counts, values=counts.values, names=counts.index, title=title)
     fig.update_layout(**get_layout(dark_mode))
-    st.plotly_chart(fig, use_container_width=True, key=get_unique_key(f"pie_{column}"))
+    st.plotly_chart(fig, width="stretch", key=get_unique_key(f"pie_{column}"))
 
 
 def plot_donut(df, column, dark_mode=False):
@@ -134,7 +134,7 @@ def plot_donut(df, column, dark_mode=False):
     fig = px.pie(counts, values=counts.values, names=counts.index, hole=0.4, title=title)
     fig.update_traces(textposition="inside", textinfo="percent+label")
     fig.update_layout(**get_layout(dark_mode))
-    st.plotly_chart(fig, use_container_width=True, key=get_unique_key(f"donut_{column}"))
+    st.plotly_chart(fig, width="stretch", key=get_unique_key(f"donut_{column}"))
 
 
 def plot_scatter(df, x_col, y_col, color_col=None, size_col=None, dark_mode=False):
@@ -179,7 +179,7 @@ def plot_scatter(df, x_col, y_col, color_col=None, size_col=None, dark_mode=Fals
 
     st.plotly_chart(
         fig,
-        use_container_width=True,
+        width="stretch",
         key=get_unique_key(f"scatter_{x_col}_{y_col}_{color_col or 'none'}_{size_col or 'none'}"),
     )
 
@@ -201,7 +201,7 @@ def plot_correlation_heatmap(df, dark_mode=False):
         height=600,
     )
     fig.update_layout(**get_layout(dark_mode))
-    st.plotly_chart(fig, use_container_width=True, key=get_unique_key("corr_heatmap"))
+    st.plotly_chart(fig, width="stretch", key=get_unique_key("corr_heatmap"))
 
 
 def plot_pairplot(df, dark_mode=False):
@@ -218,7 +218,7 @@ def plot_pairplot(df, dark_mode=False):
         height=800,
     )
     fig.update_layout(**get_layout(dark_mode))
-    st.plotly_chart(fig, use_container_width=True, key=get_unique_key("pairplot"))
+    st.plotly_chart(fig, width="stretch", key=get_unique_key("pairplot"))
 
 
 def plot_parallel_coordinates(df, dark_mode=False):
@@ -233,7 +233,7 @@ def plot_parallel_coordinates(df, dark_mode=False):
         title="Coordonnees paralleles",
     )
     fig.update_layout(**get_layout(dark_mode))
-    st.plotly_chart(fig, use_container_width=True, key=get_unique_key("parallel_coordinates"))
+    st.plotly_chart(fig, width="stretch", key=get_unique_key("parallel_coordinates"))
 
 
 def plot_radar_chart(df, categories, values, dark_mode=False):
@@ -254,7 +254,7 @@ def plot_radar_chart(df, categories, values, dark_mode=False):
         title="Diagramme radar - Comparaison de profils",
         **get_layout(dark_mode),
     )
-    st.plotly_chart(fig, use_container_width=True, key=get_unique_key("radar_chart"))
+    st.plotly_chart(fig, width="stretch", key=get_unique_key("radar_chart"))
 
 
 def plot_gauge_chart(value, title, dark_mode=False):
@@ -271,7 +271,7 @@ def plot_gauge_chart(value, title, dark_mode=False):
         )
     )
     fig.update_layout(height=500, **get_layout(dark_mode))
-    st.plotly_chart(fig, use_container_width=True, key=get_unique_key("gauge_chart"))
+    st.plotly_chart(fig, width="stretch", key=get_unique_key("gauge_chart"))
 
 
 def plot_waterfall_chart(values, labels, dark_mode=False):
@@ -287,7 +287,7 @@ def plot_waterfall_chart(values, labels, dark_mode=False):
         )
     )
     fig.update_layout(title="Graphique en cascade - Contribution", **get_layout(dark_mode))
-    st.plotly_chart(fig, use_container_width=True, key=get_unique_key("waterfall_chart"))
+    st.plotly_chart(fig, width="stretch", key=get_unique_key("waterfall_chart"))
 
 
 def plot_line_evolution(df, x_col, y_col, dark_mode=False):
@@ -316,7 +316,7 @@ def plot_line_evolution(df, x_col, y_col, dark_mode=False):
         hovermode="x unified",
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 __all__ = [
@@ -329,4 +329,6 @@ __all__ = [
     "plot_pie",
     "plot_pairplot",
 ]
+
+
 

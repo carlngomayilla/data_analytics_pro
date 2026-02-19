@@ -1,8 +1,23 @@
-﻿# core/data_loader.py
+# core/data_loader.py
 import os
 
 import pandas as pd
 import streamlit as st
+
+
+def _read_csv_robust(csv_path: str) -> pd.DataFrame:
+    attempts = [
+        {"encoding": "utf-8-sig", "sep": None, "engine": "python"},
+        {"encoding": "utf-8", "sep": None, "engine": "python"},
+        {"encoding": "latin-1", "sep": None, "engine": "python"},
+    ]
+    last_error = None
+    for options in attempts:
+        try:
+            return pd.read_csv(csv_path, low_memory=False, **options)
+        except Exception as exc:
+            last_error = exc
+    raise RuntimeError(f"Lecture CSV impossible apres plusieurs tentatives: {last_error}")
 
 
 def load_data(uploaded_file):
@@ -17,7 +32,7 @@ def load_data(uploaded_file):
 
         name = uploaded_file.name.lower()
         if name.endswith(".csv"):
-            df = pd.read_csv(save_path)
+            df = _read_csv_robust(save_path)
         elif name.endswith((".xls", ".xlsx")):
             df = pd.read_excel(save_path)
         elif name.endswith(".parquet"):
@@ -30,4 +45,5 @@ def load_data(uploaded_file):
     except Exception as e:
         st.error(f"Erreur lors du chargement: {e}")
         return None
+
 

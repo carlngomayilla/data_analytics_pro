@@ -1,5 +1,6 @@
-﻿import re
+import re
 from io import BytesIO
+import warnings
 
 import pandas as pd
 import plotly.express as px
@@ -189,14 +190,115 @@ def _build_topn_measure(
     )
 
 
+def _build_template_library(
+    table_name: str,
+    numeric_cols: list[str],
+    date_cols: list[str],
+    all_cols: list[str],
+) -> list[dict]:
+    templates: list[dict] = []
+    if numeric_cols:
+        value_col = numeric_cols[0]
+        templates.append(
+            {
+                "name": "Total Generique",
+                "description": "Somme de la colonne numerique principale.",
+                "formula": _build_basic_measure(table_name, value_col, "Somme", f"Total {value_col}"),
+            }
+        )
+        templates.append(
+            {
+                "name": "Moyenne Generique",
+                "description": "Moyenne de la colonne numerique principale.",
+                "formula": _build_basic_measure(table_name, value_col, "Moyenne", f"Moyenne {value_col}"),
+            }
+        )
+
+    if len(numeric_cols) >= 2:
+        templates.append(
+            {
+                "name": "Taux Conversion",
+                "description": "Ratio simple numerateur/denominateur.",
+                "formula": _build_ratio_measure(
+                    table_name,
+                    numeric_cols[0],
+                    numeric_cols[1],
+                    f"Taux {numeric_cols[0]} sur {numeric_cols[1]}",
+                ),
+            }
+        )
+
+    if date_cols and numeric_cols:
+        templates.append(
+            {
+                "name": "Pack YTD/MTD",
+                "description": "Bloc temporel: YTD, MTD, M-1 et croissance M/M.",
+                "formula": "\n\n".join(
+                    _build_time_intelligence_block(
+                        table_name,
+                        numeric_cols[0],
+                        date_cols[0],
+                        f"Total {numeric_cols[0]}",
+                    )
+                ),
+            }
+        )
+
+    if all_cols and numeric_cols:
+        templates.append(
+            {
+                "name": "Top N Dimension",
+                "description": "Mesure Top N pre-parametree sur la 1ere dimension.",
+                "formula": _build_topn_measure(
+                    table_name=table_name,
+                    base_measure_name=f"Total {numeric_cols[0]}",
+                    dimension_col=all_cols[0],
+                    top_n=5,
+                    measure_name=f"Top5 {all_cols[0]}",
+                ),
+            }
+        )
+    return templates
+
+
 def _store_snippet(formula: str) -> None:
     if "dax_snippets" not in st.session_state:
         st.session_state.dax_snippets = []
     st.session_state.dax_snippets.append(formula)
 
 
+def _basic_dax_syntax_checks(formula: str) -> list[str]:
+    issues: list[str] = []
+    text = (formula or "").strip()
+    if not text:
+        return ["Formule vide."]
+
+    if "=" not in text:
+        issues.append("Le separateur '=' est manquant entre nom de mesure et expression.")
+
+    open_par = text.count("(")
+    close_par = text.count(")")
+    if open_par != close_par:
+        issues.append(f"Parentheses desequilibrees: {open_par} ouvrantes vs {close_par} fermantes.")
+
+    open_br = text.count("[")
+    close_br = text.count("]")
+    if open_br != close_br:
+        issues.append(f"Crochets desequilibres: {open_br} ouvrants vs {close_br} fermants.")
+
+    quote_count = text.count('"')
+    if quote_count % 2 != 0:
+        issues.append("Guillemets doubles non appaires.")
+
+    return issues
+
+
 def _show_snippet(formula: str, button_key: str) -> None:
     st.code(formula, language="sql")
+    syntax_issues = _basic_dax_syntax_checks(formula)
+    if syntax_issues:
+        for issue in syntax_issues:
+            st.caption(f"Validation DAX: {issue}")
     if st.button("Ajouter la mesure au script DAX", key=button_key):
         _store_snippet(formula)
         st.success("La mesure a ete ajoutee au script DAX.")
@@ -281,6 +383,30 @@ def _validate_metric_spec(
 
 def _to_numeric(series: pd.Series) -> pd.Series:
     return pd.to_numeric(series, errors="coerce")
+
+
+def _to_datetime_series(series: pd.Series) -> pd.Series:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", FutureWarning)
+        parsed = pd.to_datetime(series, errors="coerce")
+
+    if isinstance(parsed, pd.Series) and pd.api.types.is_datetime64_any_dtype(parsed):
+        return parsed
+    if isinstance(parsed, pd.DatetimeIndex):
+        return pd.Series(parsed, index=series.index)
+
+    def _parse_value(value):
+        if pd.isna(value):
+            return pd.NaT
+        try:
+            ts = pd.Timestamp(value)
+        except Exception:
+            return pd.NaT
+        if ts.tzinfo is not None:
+            ts = ts.tz_localize(None)
+        return ts
+
+    return series.map(_parse_value)
 
 
 def _as_series(df: pd.DataFrame, col: str) -> pd.Series:
@@ -380,12 +506,12 @@ def _default_powerbi_measure_specs(df: pd.DataFrame, table_name: str = "Data") -
 
 
 def _build_time_drilldown_columns(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, str]]:
-    date_candidates = [col for col in df.columns if _looks_like_datetime(df[col])]
+    date_candidates = [col for col in df.columns if _looks_like_datetime(_as_series(df, col))]
     if not date_candidates:
         return df, {}
 
     base_col = date_candidates[0]
-    parsed = pd.to_datetime(df[base_col], errors="coerce")
+    parsed = _to_datetime_series(_as_series(df, base_col))
     if not parsed.notna().any():
         return df, {}
 
@@ -631,7 +757,7 @@ def _looks_like_datetime(series: pd.Series) -> bool:
     if non_null.empty:
         return False
 
-    parsed = pd.to_datetime(non_null, errors="coerce")
+    parsed = _to_datetime_series(non_null)
     return bool((parsed.notna().mean()) >= 0.8)
 
 
@@ -650,7 +776,7 @@ def _apply_slicer_filters(df: pd.DataFrame, prefix: str = "dax_slicer") -> pd.Da
 
         for col in filter_cols:
             safe_col_key = _safe_filename(col, fallback="col")
-            series = filtered_df[col]
+            series = _as_series(filtered_df, col)
             st.markdown(f"**{col}**")
 
             if pd.api.types.is_numeric_dtype(series):
@@ -678,7 +804,7 @@ def _apply_slicer_filters(df: pd.DataFrame, prefix: str = "dax_slicer") -> pd.Da
                 continue
 
             if _looks_like_datetime(series):
-                dt_series = pd.to_datetime(series, errors="coerce")
+                dt_series = _to_datetime_series(series)
                 valid = dt_series.dropna()
                 if valid.empty:
                     st.info("Aucune valeur date exploitable pour ce filtre.")
@@ -769,14 +895,15 @@ def main(df: pd.DataFrame) -> None:
                 "Taux manquant (%)": (df.isna().mean() * 100).round(2).values,
             }
         )
-        st.dataframe(profile, use_container_width=True)
+        st.dataframe(profile, width="stretch")
 
-    tab_basic, tab_time, tab_context, tab_advanced, tab_visual, tab_script = st.tabs(
+    tab_basic, tab_time, tab_context, tab_advanced, tab_library, tab_visual, tab_script = st.tabs(
         [
             "Mesures standard",
             "Intelligence temporelle",
             "Contexte de calcul",
             "Modeles avances",
+            "Bibliotheque DAX",
             "Visualisation des scripts DAX",
             "Script consolide",
         ]
@@ -910,6 +1037,27 @@ def main(df: pd.DataFrame) -> None:
         else:
             st.info("Aucune colonne de date detectee pour la comparaison avec l'annee precedente.")
 
+    with tab_library:
+        st.subheader("Bibliotheque de mesures DAX pretes a l'emploi")
+        templates = _build_template_library(
+            table_name=table_name,
+            numeric_cols=numeric_cols,
+            date_cols=date_cols,
+            all_cols=all_cols,
+        )
+        if not templates:
+            st.info("Pas assez de colonnes pour proposer des templates DAX.")
+        else:
+            template_map = {item["name"]: item for item in templates}
+            selected_template_name = st.selectbox(
+                "Template",
+                options=list(template_map.keys()),
+                key="dax_template_select",
+            )
+            selected_template = template_map[selected_template_name]
+            st.caption(selected_template["description"])
+            _show_snippet(selected_template["formula"], button_key="add_dax_template_formula")
+
     with tab_visual:
         st.subheader("Power BI-like : Mesures + Visuels")
 
@@ -1036,7 +1184,7 @@ def main(df: pd.DataFrame) -> None:
                                 display_df = display_df.rename(columns={dim_col: axis_label})
 
                             measure_col = metric_spec["measure_name"]
-                            st.dataframe(display_df, use_container_width=True)
+                            st.dataframe(display_df, width="stretch")
 
                             title = f"{selected_measure} par {axis_label}"
                             if chart_type == "Bar":
@@ -1048,7 +1196,7 @@ def main(df: pd.DataFrame) -> None:
                             else:
                                 fig = px.pie(display_df, names=axis_label, values=measure_col, title=title)
 
-                            st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(fig, width="stretch")
 
                             st.markdown("### Filtre par selection (Power BI-like)")
                             axis_values = list(dict.fromkeys(display_df[axis_label].astype(str).tolist()))
@@ -1122,6 +1270,84 @@ def main(df: pd.DataFrame) -> None:
         script_text = "\n\n".join(st.session_state.dax_snippets).strip()
         st.text_area("Script DAX consolide", value=script_text, height=280)
 
+        st.markdown("### Test rapide d'une mesure")
+        default_specs = _default_powerbi_measure_specs(df, table_name=table_name)
+        script_specs = _extract_script_measure_specs(st.session_state.dax_snippets)
+        test_specs = {**default_specs, **script_specs}
+        supported_for_test = {
+            name: spec
+            for name, spec in test_specs.items()
+            if spec.get("metric_type") in {
+                "Somme",
+                "Moyenne",
+                "Minimum",
+                "Maximum",
+                "Nombre de valeurs",
+                "Nombre distinct",
+                "Ratio",
+                "Part du total",
+            }
+        }
+        if supported_for_test:
+            test_measure = st.selectbox(
+                "Mesure a tester",
+                options=list(supported_for_test.keys()),
+                key="dax_test_measure",
+            )
+            max_sample = min(2000, len(df))
+            min_sample = 1 if max_sample < 10 else 10
+            default_sample = min(300, max_sample)
+            if default_sample < min_sample:
+                default_sample = min_sample
+            sample_step = 1 if max_sample < 10 else 10
+            sample_size = st.slider(
+                "Taille echantillon test",
+                min_value=min_sample,
+                max_value=max_sample,
+                value=default_sample,
+                step=sample_step,
+                key="dax_test_sample_size",
+            )
+            if st.button("Executer le test de mesure", key="dax_run_measure_test"):
+                spec = supported_for_test[test_measure]
+                metric_type = spec["metric_type"]
+                target_col = spec["target_col"]
+                numerator_col = spec["numerator_col"]
+                denominator_col = spec["denominator_col"]
+                validation_error = _validate_metric_spec(
+                    df=df,
+                    metric_type="Somme" if metric_type == "Part du total" else metric_type,
+                    target_col=target_col,
+                    numerator_col=numerator_col,
+                    denominator_col=denominator_col,
+                )
+                if validation_error:
+                    st.warning(validation_error)
+                else:
+                    sample_df = df.head(sample_size)
+                    full_value = _compute_metric_from_spec(df, spec)
+                    sample_value = _compute_metric_from_spec(sample_df, spec)
+                    c1, c2 = st.columns(2)
+                    c1.metric("Valeur sur base courante", _format_metric_value(full_value))
+                    c2.metric(f"Valeur sur echantillon ({sample_size})", _format_metric_value(sample_value))
+        else:
+            st.info("Aucune mesure supportee disponible pour le test rapide.")
+
+        st.markdown("### Validation manuelle DAX")
+        manual_formula = st.text_area(
+            "Collez une formule DAX a verifier",
+            value="",
+            height=120,
+            key="dax_manual_validation_input",
+        )
+        if st.button("Valider la formule DAX", key="dax_validate_manual_formula"):
+            issues = _basic_dax_syntax_checks(manual_formula)
+            if issues:
+                for issue in issues:
+                    st.error(issue)
+            else:
+                st.success("Verification de base OK (syntaxe structurelle).")
+
         col1, col2 = st.columns(2)
         with col1:
             if script_text:
@@ -1138,4 +1364,6 @@ def main(df: pd.DataFrame) -> None:
             if st.button("Reinitialiser le script"):
                 st.session_state.dax_snippets = []
                 st.success("Le script DAX a ete reinitialise.")
+
+
 

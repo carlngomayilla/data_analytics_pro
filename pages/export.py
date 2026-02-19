@@ -1,4 +1,4 @@
-﻿# pages/export.py
+# pages/export.py
 import base64
 import os
 from datetime import datetime
@@ -154,4 +154,5 @@ def main(df):
                 file_name=f"analyse_{datetime.now().strftime('%Y%m%d')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
+
 

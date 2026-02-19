@@ -1,4 +1,4 @@
-﻿import os
+import os
 import re
 from io import BytesIO
 
@@ -92,7 +92,7 @@ def main(df: pd.DataFrame) -> None:
     if grouped.empty:
         st.success("Aucune valeur manquante detectee.")
     else:
-        st.dataframe(grouped, use_container_width=True)
+        st.dataframe(grouped, width="stretch")
 
     if fully_empty_rows_count > 0:
         if st.button("Supprimer les lignes totalement vides"):
@@ -146,7 +146,7 @@ def main(df: pd.DataFrame) -> None:
 
     editable_df = editable_df.head(max_rows)
     editor_key = f"cleaning_editor_{st.session_state.get('cleaning_editor_version', 1)}"
-    edited_df = st.data_editor(editable_df, use_container_width=True, key=editor_key)
+    edited_df = st.data_editor(editable_df, width="stretch", key=editor_key)
 
     if st.button("Enregistrer les modifications manuelles"):
         updated = working_df.copy()
@@ -197,4 +197,6 @@ def main(df: pd.DataFrame) -> None:
             file_name=f"{safe_name}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
+
+
 

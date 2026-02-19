@@ -1,4 +1,4 @@
-﻿# core/data_cleaner.py
+# core/data_cleaner.py
 import streamlit as st
 
 
@@ -9,4 +9,5 @@ def clean_data(df):
     df = df.fillna(0)
     st.info(f"Nettoyage: {original_shape[0] - df.shape[0]} doublons supprimes")
     return df
+
 

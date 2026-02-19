@@ -1,4 +1,4 @@
-﻿# ui/sidebar.py
+# ui/sidebar.py
 import streamlit as st
 
 
@@ -33,12 +33,14 @@ def render():
 
         st.markdown("---")
 
-        if st.button("Reinitialiser les donnees", use_container_width=True):
-            if "df" in st.session_state:
-                del st.session_state.df
+        if st.button("Reinitialiser les donnees", width="stretch"):
+            st.session_state.clear()
             st.cache_data.clear()
+            st.cache_resource.clear()
             st.success("Les donnees et le cache ont ete reinitialises.")
             st.rerun()
 
         return uploaded_file
+
+
 

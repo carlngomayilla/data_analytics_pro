@@ -41,13 +41,13 @@ RANDOM_STATE = 42
 
 def _safe_dataframe_display(dataframe: pd.DataFrame) -> None:
     try:
-        st.dataframe(dataframe, use_container_width=True)
+        st.dataframe(dataframe, width="stretch")
     except OverflowError:
         st.warning(
             "Certaines valeurs sont trop grandes pour l'affichage natif. "
             "Conversion en texte appliquee."
         )
-        st.dataframe(dataframe.astype(str), use_container_width=True)
+        st.dataframe(dataframe.astype(str), width="stretch")
 
 
 def _infer_task(target: pd.Series) -> str:
@@ -323,7 +323,7 @@ def _display_supervised_results(result: dict) -> None:
             labels={"x": "Predit", "y": "Reel", "color": "Volume"},
             title="Matrice de confusion",
         )
-        st.plotly_chart(fig_cm, use_container_width=True)
+        st.plotly_chart(fig_cm, width="stretch")
 
     importance_df = result.get("feature_importance")
     if importance_df is not None and not importance_df.empty:
@@ -335,7 +335,7 @@ def _display_supervised_results(result: dict) -> None:
             orientation="h",
             title="Top variables explicatives",
         )
-        st.plotly_chart(fig_imp, use_container_width=True)
+        st.plotly_chart(fig_imp, width="stretch")
 
 
 def _render_supervised_tab(df: pd.DataFrame) -> None:
@@ -624,7 +624,7 @@ def _render_clustering_tab(df: pd.DataFrame) -> None:
         color="cluster",
         title=f"Visualisation des clusters ({plot_cols[0]} vs {plot_cols[1]})",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     if st.button("Ajouter les clusters a la base active", key="ml_apply_clusters"):
         new_col = cluster_result["cluster_col_name"]
@@ -754,3 +754,5 @@ def main(df: pd.DataFrame) -> None:
         _render_clustering_tab(df)
     with tab3:
         _render_prediction_tab(df)
+
+

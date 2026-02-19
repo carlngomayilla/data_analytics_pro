@@ -197,3 +197,4 @@ def style_css(theme):
         """,
             unsafe_allow_html=True,
         )
+

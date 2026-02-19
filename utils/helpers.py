@@ -3,7 +3,7 @@ import streamlit as st
 
 def get_session_state(key, default=None):
     """
-    Récupère ou initialise une valeur dans st.session_state de manière sécurisée
+    Recupere ou initialise une valeur dans st.session_state de maniere securisee.
     """
     if key not in st.session_state:
         st.session_state[key] = default

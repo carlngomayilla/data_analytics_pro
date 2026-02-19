@@ -1,4 +1,4 @@
-﻿# config/settings.py
+# config/settings.py
 # Toutes les configurations centrales
 
 APP_TITLE = "Nexus Data Analytics Pro"
@@ -39,4 +39,5 @@ ML_THRESHOLD = 0.5
 WELCOME_MESSAGE = "Bienvenue. Chargez vos donnees pour commencer."
 ERROR_MESSAGE = "Erreur: "
 SUCCESS_MESSAGE = "Operation reussie: "
+
 
