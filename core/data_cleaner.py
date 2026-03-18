@@ -2,6 +2,7 @@
 import streamlit as st
 
 
+# Explication: Nettoie les donnees de base (valeurs manquantes, doublons, etc.).
 def clean_data(df):
     original_shape = df.shape
     df = df.drop_duplicates()

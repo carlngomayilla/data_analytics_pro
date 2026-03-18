@@ -3,6 +3,7 @@ import streamlit as st
 
 
 @st.cache_data(show_spinner="Optimisation du cache...", ttl=3600)  # Cache 1 heure
+# Explication: Met en cache un DataFrame pour accelerer les recalculs.
 def df_manager(df, key=None):
     if df is None:
         return None
@@ -13,5 +14,6 @@ def df_manager(df, key=None):
 
 
 @st.cache_resource(show_spinner="Chargement des ressources...")
+# Explication: Met en cache une ressource lourde reutilisable.
 def resource_manager(obj):
     return obj

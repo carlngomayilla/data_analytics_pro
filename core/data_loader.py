@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 
 
+# Explication: Tente plusieurs encodages pour lire un CSV, meme si le fichier est mal encode.
 def _read_csv_robust(csv_path: str) -> pd.DataFrame:
     attempts = [
         {"encoding": "utf-8-sig", "sep": None, "engine": "python"},
@@ -20,6 +21,7 @@ def _read_csv_robust(csv_path: str) -> pd.DataFrame:
     raise RuntimeError(f"Lecture CSV impossible apres plusieurs tentatives: {last_error}")
 
 
+# Explication: Charge un fichier utilisateur (CSV, Excel ou Parquet) et renvoie un DataFrame.
 def load_data(uploaded_file):
     if uploaded_file is None:
         return None

@@ -22,6 +22,7 @@ from core.visualization import (
 
 
 # Interpretations automatiques
+# Explication: Affiche un DataFrame de facon stable et compatible Streamlit.
 def safe_dataframe_display(df):
     try:
         st.dataframe(df, width="stretch")
@@ -33,6 +34,7 @@ def safe_dataframe_display(df):
         st.dataframe(df.astype(str), width="stretch")
 
 
+# Explication: Donne une interpretation simple d'un graphique de distribution.
 def interpret_distribution(df, col):
     data = df[col].dropna()
     if data.empty or not pd.api.types.is_numeric_dtype(data):
@@ -50,6 +52,7 @@ def interpret_distribution(df, col):
         st.warning("Asymetrie a gauche (queue negative).")
 
 
+# Explication: Explique en mots simples une boite a moustaches.
 def interpret_boxplot(df, col):
     data = df[col].dropna()
     if data.empty or not pd.api.types.is_numeric_dtype(data):
@@ -66,6 +69,7 @@ def interpret_boxplot(df, col):
         st.warning(f"{outliers} valeurs atypiques detectees.")
 
 
+# Explication: Explique la relation visible sur un nuage de points.
 def interpret_scatter(df, x, y):
     data = df[[x, y]].dropna()
     if data.empty or len(data) < 2:
@@ -91,6 +95,7 @@ def interpret_scatter(df, x, y):
     st.success(f"Correlation {strength} {direction} (r = {corr:.3f}).")
 
 
+# Explication: Orchestre l'ecran: lit les entrees utilisateur puis affiche les resultats.
 def main(df):
     st.title("Analyses exploratoires avancees")
 
@@ -169,7 +174,6 @@ def main(df):
 
     with tab_multi:
         st.subheader("Analyse multivariee - Relations entre variables")
-
         plot_correlation_heatmap(filtered_df, dark_mode=dark_mode)
 
         if len(numeric_cols_f) >= 3:

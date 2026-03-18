@@ -10,6 +10,7 @@ INT64_MIN = np.iinfo(np.int64).min
 INT64_MAX = np.iinfo(np.int64).max
 
 
+# Explication: Convertit les grands entiers pour eviter les erreurs Arrow.
 def _normalize_bigints_for_arrow(dataframe: pd.DataFrame) -> pd.DataFrame:
     """Convertit les entiers Python hors int64 en texte pour eviter les erreurs Arrow."""
     safe_df = dataframe.copy()
@@ -25,6 +26,7 @@ def _normalize_bigints_for_arrow(dataframe: pd.DataFrame) -> pd.DataFrame:
     return safe_df
 
 
+# Explication: Affiche un DataFrame de facon stable et compatible Streamlit.
 def safe_dataframe_display(dataframe: pd.DataFrame) -> None:
     try:
         st.dataframe(_normalize_bigints_for_arrow(dataframe), width="stretch")
@@ -36,6 +38,7 @@ def safe_dataframe_display(dataframe: pd.DataFrame) -> None:
         st.dataframe(dataframe.astype(str), width="stretch")
 
 
+# Explication: Nettoie le nom de fichier utilise pour l'export.
 def _safe_export_name(name: str, fallback: str = "tableau") -> str:
     cleaned = "".join(ch.lower() if ch.isalnum() else "_" for ch in str(name))
     while "__" in cleaned:
@@ -44,6 +47,7 @@ def _safe_export_name(name: str, fallback: str = "tableau") -> str:
     return cleaned if cleaned else fallback
 
 
+# Explication: Prepare un DataFrame propre avant export.
 def _prepare_export_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
     export_df = dataframe.copy()
     if not isinstance(export_df.index, pd.RangeIndex) or export_df.index.name is not None:
@@ -52,6 +56,7 @@ def _prepare_export_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
     return _normalize_bigints_for_arrow(export_df)
 
 
+# Explication: Convertit un tableau en fichier Excel en memoire (bytes).
 def _to_excel_bytes(dataframe: pd.DataFrame, sheet_name: str = "tableau") -> bytes:
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
@@ -60,6 +65,7 @@ def _to_excel_bytes(dataframe: pd.DataFrame, sheet_name: str = "tableau") -> byt
     return output.getvalue()
 
 
+# Explication: Affiche un tableau avec boutons d'export.
 def render_exportable_table(
     dataframe: pd.DataFrame,
     export_key: str,
@@ -92,6 +98,7 @@ def render_exportable_table(
     )
 
 
+# Explication: Calcule le coefficient de Gini d'une distribution.
 def gini_coefficient(x):
     """Calcule l'indice de Gini pour une serie de valeurs numeriques positives."""
     x = np.array(x.dropna())
@@ -109,6 +116,7 @@ def gini_coefficient(x):
     return round(gini, 4)
 
 
+# Explication: Orchestre l'ecran: lit les entrees utilisateur puis affiche les resultats.
 def main(df):
     st.title("Tableau de bord - Statistiques descriptives et analytiques")
 

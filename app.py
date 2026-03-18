@@ -1,5 +1,6 @@
-﻿# app.py
+# app.py
 import base64
+from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote
 
@@ -18,6 +19,7 @@ BASE_DIR = Path(__file__).parent
 LOGO_PATH = BASE_DIR / "logo" / "NEXUS.jpeg"
 
 
+# Explication: Renomme les colonnes dupliquees pour eviter les conflits de noms.
 def ensure_unique_dataframe_columns(df):
     seen = {}
     used = set()
@@ -51,6 +53,7 @@ def ensure_unique_dataframe_columns(df):
     return out, renamed
 
 
+# Explication: Recupere une colonne en serie de maniere sure, meme si la colonne manque.
 def _safe_as_series(df: pd.DataFrame, col: str) -> pd.Series:
     selected = df.loc[:, col]
     if isinstance(selected, pd.DataFrame):
@@ -58,6 +61,7 @@ def _safe_as_series(df: pd.DataFrame, col: str) -> pd.Series:
     return selected
 
 
+# Explication: Calcule une metrique par dimension en evitant les erreurs de type.
 def safe_compute_metric_by_dimension(
     df: pd.DataFrame,
     dimension_col: str,
@@ -104,6 +108,7 @@ def safe_compute_metric_by_dimension(
     return result
 
 
+# Explication: Affiche le logo dans un format circulaire pour l'en-tete.
 def render_circular_logo(path: Path, size_px: int = 120) -> None:
     if not path.exists():
         raise FileNotFoundError
@@ -134,6 +139,7 @@ def render_circular_logo(path: Path, size_px: int = 120) -> None:
     )
 
 
+# Explication: Affiche un resume simple de la qualite des donnees.
 def render_data_quality_feedback(report: dict | None) -> None:
     if not report:
         return
@@ -173,6 +179,29 @@ def render_data_quality_feedback(report: dict | None) -> None:
             st.dataframe(preview, width="stretch")
 
 
+# Explication: Charge et prepare un fichier (lecture + typage) avec cache pour eviter les recalculs.
+@st.cache_data(show_spinner=False)
+def _load_and_prepare_from_bytes(file_name: str, file_bytes: bytes) -> dict | None:
+    uploaded_buffer = BytesIO(file_bytes)
+    uploaded_buffer.name = file_name
+
+    raw_df = load_data(uploaded_buffer)
+    if raw_df is None:
+        return None
+
+    typed_df, quality_report = normalize_dataframe_types(raw_df)
+    normalized_df, renamed_cols = ensure_unique_dataframe_columns(typed_df)
+    managed_df = df_manager(normalized_df)
+
+    return {
+        "df": managed_df,
+        "quality_report": quality_report,
+        "renamed_cols": renamed_cols,
+        "shape": (len(raw_df), len(raw_df.columns)),
+    }
+
+
+# Explication: Construit l'URI d'une diapositive de presentation des donnees.
 def _build_data_slide_uri(title: str, color_a: str, color_b: str) -> str:
     svg = f"""
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
@@ -206,6 +235,7 @@ def _build_data_slide_uri(title: str, color_a: str, color_b: str) -> str:
     return f"data:image/svg+xml;utf8,{quote(svg)}"
 
 
+# Explication: Affiche l'ecran de presentation de l'application.
 def render_app_presentation() -> None:
     slides = [
         ("Exploration des donnees", "#0f172a", "#1d4ed8"),
@@ -299,9 +329,9 @@ def render_app_presentation() -> None:
         """
 Dans un environnement ou la donnee est devenue un actif strategique, **Nexus Data Analytics Pro** offre une infrastructure analytique complete permettant de transformer des volumes complexes d'informations en decisions claires, mesurables et performantes.
 
-Concue par **M. NGOMAYILLA NDEMA Christopher**, expert en ingenierie analytique et responsable du groupe **NEXUS**, la plateforme allie rigueur scientifique, intelligence artificielle et excellence technologique.
+Concue par **M. NGOMAYILLA NDEMA Christopher**, responsable du groupe **NEXUS**, la plateforme allie rigueur scientifique, intelligence artificielle et excellence technologique.
 
-🌍 **Une plateforme. Une vision. Une maitrise totale de la donnee.**
+ **Une plateforme. Une vision. Une maitrise totale de la donnee.**
 
 Nexus Data Analytics Pro n'est pas un simple outil d'analyse.
 
@@ -314,9 +344,9 @@ C'est un environnement integre qui couvre l'ensemble du cycle de vie des donnees
 - Intelligence predictive
 - Reporting strategique
 
-## ⚙️ Architecture Modulaire Haute Performance
+## Architecture Modulaire Haute Performance
 
-### 1️⃣ Executive Dashboard
+### Executive Dashboard
 Visualisation instantanee des indicateurs cles.
 
 - Statistiques descriptives automatisees
@@ -326,7 +356,7 @@ Visualisation instantanee des indicateurs cles.
 
 Une vue decisionnelle immediate.
 
-### 2️⃣ Advanced Analytics Engine
+### Advanced Analytics Engine
 Puissance statistique integree.
 
 - Analyses univariees, bivariees, multivariees
@@ -335,7 +365,7 @@ Puissance statistique integree.
 
 Comprendre les relations invisibles dans vos donnees.
 
-### 3️⃣ Data Engineering Suite
+### Data Engineering Suite
 Maitrise totale de la qualite des donnees.
 
 - Detection intelligente des incoherences
@@ -345,7 +375,7 @@ Maitrise totale de la qualite des donnees.
 
 Des donnees fiables. Des analyses solides.
 
-### 4️⃣ Artificial Intelligence & Machine Learning
+### Artificial Intelligence & Machine Learning
 Intelligence integree a votre strategie.
 
 - Modeles supervises (classification, regression)
@@ -355,7 +385,7 @@ Intelligence integree a votre strategie.
 
 Passez de l'analyse descriptive a la prediction strategique.
 
-### 5️⃣ Business Intelligence & DAX Modeling
+### Business Intelligence & DAX Modeling
 Pont direct vers l'ecosysteme BI.
 
 - Generation automatisee de mesures DAX
@@ -365,7 +395,7 @@ Pont direct vers l'ecosysteme BI.
 
 Un moteur BI integre a votre workflow Python.
 
-### 6️⃣ Smart Data Control
+### Smart Data Control
 Edition securisee et tracable.
 
 - Filtres simples et croises
@@ -375,7 +405,7 @@ Edition securisee et tracable.
 
 Un controle absolu, sans perte d'integrite.
 
-### 7️⃣ Professional Reporting
+### Professional Reporting
 Communication analytique optimisee.
 
 - Rapports PDF premium
@@ -384,7 +414,7 @@ Communication analytique optimisee.
 
 Transformez vos analyses en livrables executifs.
 
-## 🎯 Positionnement Strategique
+## Positionnement Strategique
 
 Nexus Data Analytics Pro s'adresse a:
 
@@ -394,14 +424,14 @@ Nexus Data Analytics Pro s'adresse a:
 - Centres de recherche
 - Universites et ecoles specialisees
 
-## 🔐 Philosophie
+## Philosophie
 
 Rigueur scientifique.  
 Clarte decisionnelle.  
 Automatisation intelligente.  
 Securite des donnees.
 
-## 💡 Notre ambition
+## Notre ambition
 
 Creer une plateforme capable de rivaliser avec les standards internationaux en matiere d'analyse decisionnelle, tout en restant accessible, modulaire et evolutive.
         """
@@ -425,29 +455,27 @@ theme = st.session_state.get("theme", "dark")
 style_css(theme)
 
 # Sidebar: retourne le fichier charge
-uploaded_file = render_sidebar()
+uploaded_payload, upload_submitted = render_sidebar()
 
 # Chargement et persistance des donnees
 if "df" not in st.session_state:
     st.session_state.df = None
 
-if uploaded_file is not None:
+if upload_submitted and uploaded_payload is not None:
     with st.spinner("Chargement du fichier en cours..."):
-
-        @st.cache_data(show_spinner=False)
-        def load_cached(_file):
-            return load_data(_file)
-
-        raw_df = load_cached(uploaded_file)
-        if raw_df is not None:
-            typed_df, quality_report = normalize_dataframe_types(raw_df)
-            normalized_df, renamed_cols = ensure_unique_dataframe_columns(typed_df)
-            st.session_state.df = df_manager(normalized_df)
-            st.session_state.data_quality_report = quality_report
+        prepared = _load_and_prepare_from_bytes(
+            uploaded_payload["name"],
+            uploaded_payload["bytes"],
+        )
+        if prepared is not None:
+            st.session_state.df = prepared["df"]
+            st.session_state.data_quality_report = prepared["quality_report"]
+            raw_rows, raw_cols = prepared["shape"]
             st.success(
-                f"Fichier {uploaded_file.name} charge avec succes "
-                f"({len(raw_df):,} lignes x {len(raw_df.columns)} colonnes)."
+                f"Fichier {uploaded_payload['name']} charge avec succes "
+                f"({raw_rows:,} lignes x {raw_cols} colonnes)."
             )
+            renamed_cols = prepared["renamed_cols"]
             if renamed_cols:
                 preview = ", ".join(f"`{old}` -> `{new}`" for old, new in renamed_cols[:6])
                 if len(renamed_cols) > 6:
@@ -457,7 +485,7 @@ if uploaded_file is not None:
                     "Des noms uniques ont ete appliques pour eviter les erreurs de calcul: "
                     f"{preview}"
                 )
-            if quality_report.get("forced_string"):
+            if prepared["quality_report"].get("forced_string"):
                 st.warning(
                     "Certaines colonnes ont ete forcees en texte (types heterogenes) "
                     "pour eviter les erreurs d'affichage/filtrage."
@@ -477,12 +505,12 @@ with col2:
     st.title(APP_TITLE)
     st.subheader(APP_SUBTITLE)
 
-render_app_presentation()
-render_data_quality_feedback(st.session_state.get("data_quality_report"))
-
 if df is None:
+    render_app_presentation()
     st.info("Utilisez la barre laterale pour charger un fichier et demarrer l'analyse.")
     st.stop()
+
+render_data_quality_feedback(st.session_state.get("data_quality_report"))
 
 # Navigation principale (selecteur unique pour eviter le masquage des onglets)
 module_options = [

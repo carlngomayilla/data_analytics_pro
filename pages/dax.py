@@ -8,6 +8,7 @@ import plotly.io as pio
 import streamlit as st
 
 
+# Explication: Construit la reference DAX d'une table.
 def _dax_table_ref(table_name: str) -> str:
     safe_name = (table_name or "Data").strip().replace("'", "''")
     if not safe_name:
@@ -15,26 +16,31 @@ def _dax_table_ref(table_name: str) -> str:
     return f"'{safe_name}'"
 
 
+# Explication: Construit la reference DAX d'une colonne.
 def _dax_col_ref(table_name: str, column_name: str) -> str:
     return f"{_dax_table_ref(table_name)}[{column_name}]"
 
 
+# Explication: Nettoie le nom d'une mesure pour le rendre valide en DAX.
 def _sanitize_measure_name(name: str, fallback: str = "Mesure") -> str:
     cleaned = "".join(ch for ch in (name or "") if ch.isalnum() or ch in " _-")
     cleaned = cleaned.strip()
     return cleaned if cleaned else fallback
 
 
+# Explication: Nettoie un texte pour produire un nom de fichier valide.
 def _safe_filename(name: str, fallback: str = "visual_dax") -> str:
     cleaned = "".join(ch if ch.isalnum() or ch in "_-" else "_" for ch in (name or ""))
     cleaned = cleaned.strip("_")
     return cleaned if cleaned else fallback
 
 
+# Explication: Construit la reference DAX d'une mesure.
 def _measure_ref(name: str, fallback: str = "Mesure") -> str:
     return f"[{_sanitize_measure_name(name, fallback=fallback)}]"
 
 
+# Explication: Rend les noms de colonnes uniques pour eviter les ambiguites.
 def _ensure_unique_columns(df: pd.DataFrame) -> tuple[pd.DataFrame, list[tuple[str, str]]]:
     seen: dict[str, int] = {}
     used: set[str] = set()
@@ -68,6 +74,7 @@ def _ensure_unique_columns(df: pd.DataFrame) -> tuple[pd.DataFrame, list[tuple[s
     return out, renames
 
 
+# Explication: Genere une mesure DAX simple (somme, moyenne, etc.).
 def _build_basic_measure(table_name: str, column_name: str, metric_type: str, measure_name: str) -> str:
     col_ref = _dax_col_ref(table_name, column_name)
     expressions = {
@@ -82,6 +89,7 @@ def _build_basic_measure(table_name: str, column_name: str, metric_type: str, me
     return f"{_sanitize_measure_name(measure_name)} = {expr}"
 
 
+# Explication: Genere une mesure DAX de ratio numerateur/denominateur.
 def _build_ratio_measure(table_name: str, numerator_col: str, denominator_col: str, measure_name: str) -> str:
     numerator_ref = _dax_col_ref(table_name, numerator_col)
     denominator_ref = _dax_col_ref(table_name, denominator_col)
@@ -91,6 +99,7 @@ def _build_ratio_measure(table_name: str, numerator_col: str, denominator_col: s
     )
 
 
+# Explication: Construit un bloc DAX pour les calculs temporels.
 def _build_time_intelligence_block(
     table_name: str, value_col: str, date_col: str, base_measure_name: str
 ) -> list[str]:
@@ -113,6 +122,7 @@ def _build_time_intelligence_block(
     ]
 
 
+# Explication: Construit un bloc DAX qui respecte le contexte de filtre.
 def _build_context_block(table_name: str, value_measure_name: str, dimension_col: str) -> list[str]:
     table_ref = _dax_table_ref(table_name)
     dim_ref = _dax_col_ref(table_name, dimension_col)
@@ -130,6 +140,7 @@ def _build_context_block(table_name: str, value_measure_name: str, dimension_col
     ]
 
 
+# Explication: Construit une mesure DAX avec un filtre applique.
 def _build_filter_measure(
     table_name: str,
     base_measure_name: str,
@@ -147,6 +158,7 @@ def _build_filter_measure(
     )
 
 
+# Explication: Construit une mesure DAX qui ignore certains filtres.
 def _build_removefilters_measure(
     table_name: str,
     base_measure_name: str,
@@ -160,6 +172,7 @@ def _build_removefilters_measure(
     )
 
 
+# Explication: Construit un bloc DAX pour la comparaison annee sur annee.
 def _build_yoy_block(base_measure_name: str, date_ref: str) -> list[str]:
     base = _sanitize_measure_name(base_measure_name, fallback="Mesure Base")
     return [
@@ -175,6 +188,7 @@ def _build_yoy_block(base_measure_name: str, date_ref: str) -> list[str]:
     ]
 
 
+# Explication: Construit une mesure DAX pour un classement Top N.
 def _build_topn_measure(
     table_name: str,
     base_measure_name: str,
@@ -190,6 +204,7 @@ def _build_topn_measure(
     )
 
 
+# Explication: Prepare une bibliotheque de modeles DAX prets a l'emploi.
 def _build_template_library(
     table_name: str,
     numeric_cols: list[str],
@@ -261,12 +276,14 @@ def _build_template_library(
     return templates
 
 
+# Explication: Sauvegarde une formule DAX dans l'historique local.
 def _store_snippet(formula: str) -> None:
     if "dax_snippets" not in st.session_state:
         st.session_state.dax_snippets = []
     st.session_state.dax_snippets.append(formula)
 
 
+# Explication: Effectue des controles simples de syntaxe DAX.
 def _basic_dax_syntax_checks(formula: str) -> list[str]:
     issues: list[str] = []
     text = (formula or "").strip()
@@ -293,6 +310,7 @@ def _basic_dax_syntax_checks(formula: str) -> list[str]:
     return issues
 
 
+# Explication: Affiche une formule DAX avec options de copie/usage.
 def _show_snippet(formula: str, button_key: str) -> None:
     st.code(formula, language="sql")
     syntax_issues = _basic_dax_syntax_checks(formula)
@@ -304,6 +322,7 @@ def _show_snippet(formula: str, button_key: str) -> None:
         st.success("La mesure a ete ajoutee au script DAX.")
 
 
+# Explication: Extrait la premiere ligne utile d'une formule.
 def _first_formula_line(snippet: str) -> str:
     for line in (snippet or "").splitlines():
         stripped = line.strip()
@@ -312,6 +331,7 @@ def _first_formula_line(snippet: str) -> str:
     return ""
 
 
+# Explication: Analyse une formule pour reconnaitre une mesure prise en charge.
 def _parse_supported_measure(formula_line: str) -> dict | None:
     if "=" not in (formula_line or ""):
         return None
@@ -363,6 +383,7 @@ def _parse_supported_measure(formula_line: str) -> dict | None:
     return None
 
 
+# Explication: Verifie qu'une specification de metrique est exploitable.
 def _validate_metric_spec(
     df: pd.DataFrame,
     metric_type: str,
@@ -381,10 +402,12 @@ def _validate_metric_spec(
     return None
 
 
+# Explication: Convertit une serie en valeurs numeriques quand c'est possible.
 def _to_numeric(series: pd.Series) -> pd.Series:
     return pd.to_numeric(series, errors="coerce")
 
 
+# Explication: Convertit une serie en dates/heures de maniere robuste.
 def _to_datetime_series(series: pd.Series) -> pd.Series:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", FutureWarning)
@@ -395,6 +418,7 @@ def _to_datetime_series(series: pd.Series) -> pd.Series:
     if isinstance(parsed, pd.DatetimeIndex):
         return pd.Series(parsed, index=series.index)
 
+    # Explication: Convertit une valeur texte vers un type exploitable (date, nombre, etc.).
     def _parse_value(value):
         if pd.isna(value):
             return pd.NaT
@@ -409,6 +433,7 @@ def _to_datetime_series(series: pd.Series) -> pd.Series:
     return series.map(_parse_value)
 
 
+# Explication: Recupere une colonne en serie pandas, ou une serie vide si absente.
 def _as_series(df: pd.DataFrame, col: str) -> pd.Series:
     selected = df.loc[:, col]
     if isinstance(selected, pd.DataFrame):
@@ -417,6 +442,7 @@ def _as_series(df: pd.DataFrame, col: str) -> pd.Series:
     return selected
 
 
+# Explication: Trouve une colonne par nom exact.
 def _find_column_exact(columns: list[str], desired: str) -> str | None:
     desired_norm = (desired or "").strip().lower()
     if not desired_norm:
@@ -427,6 +453,7 @@ def _find_column_exact(columns: list[str], desired: str) -> str | None:
     return None
 
 
+# Explication: Choisit la colonne la plus probable selon des mots-cles.
 def _pick_column_by_keywords(columns: list[str], keywords: list[str]) -> str | None:
     lowered = [(col, str(col).lower()) for col in columns]
     for keyword in keywords:
@@ -437,6 +464,7 @@ def _pick_column_by_keywords(columns: list[str], keywords: list[str]) -> str | N
     return None
 
 
+# Explication: Extrait les specifications de mesures depuis des scripts DAX.
 def _extract_script_measure_specs(snippets: list[str]) -> dict[str, dict]:
     specs: dict[str, dict] = {}
     for snippet in snippets:
@@ -447,6 +475,7 @@ def _extract_script_measure_specs(snippets: list[str]) -> dict[str, dict]:
     return specs
 
 
+# Explication: Propose des mesures Power BI par defaut selon les colonnes disponibles.
 def _default_powerbi_measure_specs(df: pd.DataFrame, table_name: str = "Data") -> dict[str, dict]:
     all_cols = df.columns.tolist()
     numeric_cols = df.select_dtypes(include="number").columns.tolist()
@@ -505,6 +534,7 @@ def _default_powerbi_measure_specs(df: pd.DataFrame, table_name: str = "Data") -
     return specs
 
 
+# Explication: Cree des colonnes de drill-down temporel (annee, mois, etc.).
 def _build_time_drilldown_columns(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, str]]:
     date_candidates = [col for col in df.columns if _looks_like_datetime(_as_series(df, col))]
     if not date_candidates:
@@ -522,6 +552,7 @@ def _build_time_drilldown_columns(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[
     return enriched, {"Année": "__dax_year__", "Mois": "__dax_month__", "Jour": "__dax_day__"}
 
 
+# Explication: Calcule le tableau final alimentant le visuel type Power BI.
 def _compute_powerbi_visual_df(
     df: pd.DataFrame,
     axis_col: str,
@@ -581,6 +612,7 @@ def _compute_powerbi_visual_df(
     return result
 
 
+# Explication: Calcule une metrique a partir de sa specification.
 def _compute_metric_from_spec(df: pd.DataFrame, metric_spec: dict) -> float:
     metric_type = metric_spec["metric_type"]
     target_col = metric_spec["target_col"]
@@ -605,6 +637,7 @@ def _compute_metric_from_spec(df: pd.DataFrame, metric_spec: dict) -> float:
     )
 
 
+# Explication: Calcule une metrique globale sur tout le jeu de donnees.
 def _compute_metric_global(
     df: pd.DataFrame,
     metric_type: str,
@@ -635,6 +668,7 @@ def _compute_metric_global(
     return float("nan")
 
 
+# Explication: Calcule une metrique groupee par dimension.
 def _compute_metric_by_dimension(
     df: pd.DataFrame,
     dimension_col: str,
@@ -681,6 +715,7 @@ def _compute_metric_by_dimension(
     return result
 
 
+# Explication: Prepare le DataFrame final pour la visualisation.
 def _prepare_visual_dataframe(
     grouped_df: pd.DataFrame,
     dimension_col: str,
@@ -702,6 +737,7 @@ def _prepare_visual_dataframe(
     return result.head(top_n)
 
 
+# Explication: Construit la figure Plotly selon le type de visuel choisi.
 def _build_visual_figure(
     visual_df: pd.DataFrame,
     dimension_col: str,
@@ -726,6 +762,7 @@ def _build_visual_figure(
     return fig
 
 
+# Explication: Convertit un tableau en fichier Excel en memoire (bytes).
 def _to_excel_bytes(df: pd.DataFrame, sheet_name: str = "visual_dax") -> bytes:
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
@@ -734,6 +771,7 @@ def _to_excel_bytes(df: pd.DataFrame, sheet_name: str = "visual_dax") -> bytes:
     return output.getvalue()
 
 
+# Explication: Convertit une figure en image PNG en memoire.
 def _figure_to_png_bytes(fig):
     try:
         return pio.to_image(fig, format="png", width=1200, height=700, scale=2), None
@@ -741,6 +779,7 @@ def _figure_to_png_bytes(fig):
         return None, str(exc)
 
 
+# Explication: Formate une valeur metrique pour un affichage lisible.
 def _format_metric_value(value: float) -> str:
     if pd.isna(value):
         return "N/A"
@@ -749,6 +788,7 @@ def _format_metric_value(value: float) -> str:
     return f"{value:,.4f}"
 
 
+# Explication: Detecte si une colonne ressemble a des dates.
 def _looks_like_datetime(series: pd.Series) -> bool:
     if pd.api.types.is_datetime64_any_dtype(series):
         return True
@@ -761,6 +801,7 @@ def _looks_like_datetime(series: pd.Series) -> bool:
     return bool((parsed.notna().mean()) >= 0.8)
 
 
+# Explication: Applique les filtres de segment (slicers) au DataFrame.
 def _apply_slicer_filters(df: pd.DataFrame, prefix: str = "dax_slicer") -> pd.DataFrame:
     st.markdown("### Filtres interactifs (type Power BI)")
     st.caption("Ces filtres s'appliquent directement aux visuels et aux indicateurs de cette section.")
@@ -855,6 +896,7 @@ def _apply_slicer_filters(df: pd.DataFrame, prefix: str = "dax_slicer") -> pd.Da
     return filtered_df
 
 
+# Explication: Orchestre l'ecran: lit les entrees utilisateur puis affiche les resultats.
 def main(df: pd.DataFrame) -> None:
     st.title("Modelisation DAX pour Power BI")
 
@@ -1147,7 +1189,6 @@ def main(df: pd.DataFrame) -> None:
                     target_col = metric_spec["target_col"]
                     numerator_col = metric_spec["numerator_col"]
                     denominator_col = metric_spec["denominator_col"]
-
                     validation_error = _validate_metric_spec(
                         visual_source_df,
                         "Somme" if metric_type == "Part du total" else metric_type,

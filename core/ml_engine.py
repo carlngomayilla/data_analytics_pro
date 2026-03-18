@@ -8,6 +8,7 @@ from xgboost import XGBClassifier, XGBRegressor
 from config.settings import ML_THRESHOLD
 
 
+# Explication: Entraine des modeles de machine learning de base et affiche leurs scores.
 def run_ml(df, target):
     if target not in df.columns:
         st.error("La variable cible est introuvable.")

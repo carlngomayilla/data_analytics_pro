@@ -2,6 +2,7 @@
 import streamlit as st
 
 
+# Explication: Applique le style CSS de l'interface selon le theme choisi.
 def style_css(theme):
     if theme == "dark":
         st.markdown(

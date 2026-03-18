@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 
+# Explication: Recupere une colonne en serie pandas, ou une serie vide si absente.
 def _as_series(df: pd.DataFrame, col: str) -> pd.Series:
     selected = df.loc[:, col]
     if isinstance(selected, pd.DataFrame):
@@ -13,6 +14,7 @@ def _as_series(df: pd.DataFrame, col: str) -> pd.Series:
     return selected
 
 
+# Explication: Compare deux colonnes comme texte pour une recherche souple.
 def _compare_as_text(
     series: pd.Series,
     query: str,
@@ -31,6 +33,7 @@ def _compare_as_text(
     return values.str.contains(target, regex=False, na=False)
 
 
+# Explication: Construit un masque booleen pour la recherche multicritere.
 def _build_search_mask(
     df: pd.DataFrame,
     selected_column: str,
@@ -53,6 +56,19 @@ def _build_search_mask(
     return _compare_as_text(series, query, search_mode, case_sensitive)
 
 
+# Explication: Calcule le masque de recherche avec cache pour eviter les recalculs inutiles.
+@st.cache_data(show_spinner=False)
+def _cached_build_search_mask(
+    df: pd.DataFrame,
+    selected_column: str,
+    query: str,
+    search_mode: str,
+    case_sensitive: bool,
+) -> pd.Series:
+    return _build_search_mask(df, selected_column, query, search_mode, case_sensitive)
+
+
+# Explication: Convertit une serie en dates/heures de maniere robuste.
 def _to_datetime_series(series: pd.Series) -> pd.Series:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", FutureWarning)
@@ -69,6 +85,7 @@ def _to_datetime_series(series: pd.Series) -> pd.Series:
             parsed = parsed.tz_localize(None)
         return pd.Series(parsed, index=series.index)
 
+    # Explication: Convertit une valeur texte vers un type exploitable (date, nombre, etc.).
     def _parse_value(value):
         if pd.isna(value):
             return pd.NaT
@@ -83,6 +100,7 @@ def _to_datetime_series(series: pd.Series) -> pd.Series:
     return series.map(_parse_value)
 
 
+# Explication: Detecte si une colonne ressemble a des dates.
 def _looks_like_datetime(series: pd.Series) -> bool:
     if pd.api.types.is_datetime64_any_dtype(series):
         return True
@@ -95,6 +113,7 @@ def _looks_like_datetime(series: pd.Series) -> bool:
     return bool((parsed.notna().mean()) >= 0.8)
 
 
+# Explication: Applique un filtre de texte sur une colonne.
 def _apply_text_filter(
     series: pd.Series,
     operator: str,
@@ -127,6 +146,7 @@ def _apply_text_filter(
     return values.str.contains(target, regex=False, na=False)
 
 
+# Explication: Applique un filtre numerique (intervalle, seuil, etc.).
 def _apply_numeric_filter(
     series: pd.Series,
     operator: str,
@@ -164,6 +184,7 @@ def _apply_numeric_filter(
     return pd.Series(False, index=series.index)
 
 
+# Explication: Applique un filtre sur une plage de dates.
 def _apply_datetime_filter(
     series: pd.Series,
     operator: str,
@@ -204,6 +225,7 @@ def _apply_datetime_filter(
     return pd.Series(False, index=series.index)
 
 
+# Explication: Combine plusieurs masques de filtre (ET/OU).
 def _combine_masks(masks: list[pd.Series], mode: str, index) -> pd.Series:
     if not masks:
         return pd.Series(True, index=index)
@@ -220,6 +242,7 @@ def _combine_masks(masks: list[pd.Series], mode: str, index) -> pd.Series:
     return combined
 
 
+# Explication: Affiche les filtres croises et renvoie le resultat filtre.
 def _render_cross_filters(
     df: pd.DataFrame,
     case_sensitive: bool,
@@ -372,6 +395,7 @@ def _render_cross_filters(
     return combined_mask, active_filters
 
 
+# Explication: Restaure les types de colonnes apres edition.
 def _restore_types(updated_df: pd.DataFrame, reference_df: pd.DataFrame) -> pd.DataFrame:
     restored = updated_df.copy()
 
@@ -386,6 +410,7 @@ def _restore_types(updated_df: pd.DataFrame, reference_df: pd.DataFrame) -> pd.D
     return restored
 
 
+# Explication: Convertit un tableau en fichier Excel en memoire (bytes).
 def _to_excel_bytes(df: pd.DataFrame) -> bytes:
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
@@ -394,6 +419,7 @@ def _to_excel_bytes(df: pd.DataFrame) -> bytes:
     return output.getvalue()
 
 
+# Explication: Cree une signature de la source pour detecter les changements de donnees.
 def _source_signature(df: pd.DataFrame) -> tuple:
     return (
         len(df),
@@ -402,6 +428,7 @@ def _source_signature(df: pd.DataFrame) -> tuple:
     )
 
 
+# Explication: Initialise l'historique d'edition si necessaire.
 def _init_edit_history_if_needed(df: pd.DataFrame) -> None:
     signature = _source_signature(df)
     if st.session_state.get("data_editor_source_signature") != signature:
@@ -409,6 +436,12 @@ def _init_edit_history_if_needed(df: pd.DataFrame) -> None:
         st.session_state.data_editor_undo_stack = []
         st.session_state.data_editor_redo_stack = []
         st.session_state.data_editor_change_log = []
+        st.session_state.data_editor_matching_index = df.index.tolist()
+        st.session_state.data_editor_last_search_meta = {
+            "has_query": False,
+            "active_cross_filters": 0,
+            "last_run_at": None,
+        }
 
     if "data_editor_undo_stack" not in st.session_state:
         st.session_state.data_editor_undo_stack = []
@@ -416,8 +449,17 @@ def _init_edit_history_if_needed(df: pd.DataFrame) -> None:
         st.session_state.data_editor_redo_stack = []
     if "data_editor_change_log" not in st.session_state:
         st.session_state.data_editor_change_log = []
+    if "data_editor_matching_index" not in st.session_state:
+        st.session_state.data_editor_matching_index = df.index.tolist()
+    if "data_editor_last_search_meta" not in st.session_state:
+        st.session_state.data_editor_last_search_meta = {
+            "has_query": False,
+            "active_cross_filters": 0,
+            "last_run_at": None,
+        }
 
 
+# Explication: Compte les lignes, colonnes et cellules modifiees.
 def _count_changed_cells(before_df: pd.DataFrame, after_df: pd.DataFrame) -> tuple[int, int, int]:
     common_index = before_df.index.intersection(after_df.index)
     common_cols = before_df.columns.intersection(after_df.columns)
@@ -434,6 +476,7 @@ def _count_changed_cells(before_df: pd.DataFrame, after_df: pd.DataFrame) -> tup
     return changed_cells, changed_rows, changed_cols
 
 
+# Explication: Ajoute un etat precedent dans la pile d'annulation.
 def _push_undo_snapshot(previous_df: pd.DataFrame, max_depth: int = 10) -> None:
     stack = st.session_state.get("data_editor_undo_stack", [])
     stack.append(previous_df.copy())
@@ -442,6 +485,7 @@ def _push_undo_snapshot(previous_df: pd.DataFrame, max_depth: int = 10) -> None:
     st.session_state.data_editor_undo_stack = stack
 
 
+# Explication: Ajoute un etat precedent dans la pile de retablissement.
 def _push_redo_snapshot(previous_df: pd.DataFrame, max_depth: int = 10) -> None:
     stack = st.session_state.get("data_editor_redo_stack", [])
     stack.append(previous_df.copy())
@@ -450,6 +494,7 @@ def _push_redo_snapshot(previous_df: pd.DataFrame, max_depth: int = 10) -> None:
     st.session_state.data_editor_redo_stack = stack
 
 
+# Explication: Ajoute une entree dans le journal des modifications.
 def _append_change_log(action: str, changed_rows: int, changed_cols: int, changed_cells: int) -> None:
     logs = st.session_state.get("data_editor_change_log", [])
     logs.append(
@@ -464,6 +509,7 @@ def _append_change_log(action: str, changed_rows: int, changed_cols: int, change
     st.session_state.data_editor_change_log = logs[-50:]
 
 
+# Explication: Affiche l'historique des modifications utilisateur.
 def _render_edit_history(reference_df: pd.DataFrame) -> None:
     undo_stack = st.session_state.get("data_editor_undo_stack", [])
     redo_stack = st.session_state.get("data_editor_redo_stack", [])
@@ -507,6 +553,7 @@ def _render_edit_history(reference_df: pd.DataFrame) -> None:
             st.caption("Aucune modification enregistree pour le moment.")
 
 
+# Explication: Orchestre l'ecran: lit les entrees utilisateur puis affiche les resultats.
 def main(df: pd.DataFrame) -> None:
     st.title("Recherche et modification de donnees")
 
@@ -523,13 +570,30 @@ def main(df: pd.DataFrame) -> None:
     _render_edit_history(st.session_state.get("df", df))
 
     st.subheader("Recherche simple")
-    selected_column = st.selectbox("Colonne a explorer", ["Toutes les colonnes"] + df.columns.tolist())
-    search_mode = st.radio("Type de recherche", ["Contient", "Egal"], horizontal=True)
-    case_sensitive = st.checkbox("Respecter la casse", value=False)
-    query = st.text_input("Valeur a rechercher (optionnel)")
+    selected_column = st.selectbox(
+        "Colonne a explorer",
+        ["Toutes les colonnes"] + df.columns.tolist(),
+        key="data_editor_selected_column",
+    )
+    search_mode = st.radio(
+        "Type de recherche",
+        ["Contient", "Egal"],
+        horizontal=True,
+        key="data_editor_search_mode",
+    )
+    case_sensitive = st.checkbox(
+        "Respecter la casse",
+        value=False,
+        key="data_editor_case_sensitive",
+    )
+    query = st.text_input("Valeur a rechercher (optionnel)", key="data_editor_query")
     export_anchor = st.container()
 
-    enable_cross_filters = st.checkbox("Activer les filtres croises", value=False)
+    enable_cross_filters = st.checkbox(
+        "Activer les filtres croises",
+        value=False,
+        key="data_editor_enable_cross_filters",
+    )
 
     cross_mask = pd.Series(True, index=df.index)
     active_cross_filters = 0

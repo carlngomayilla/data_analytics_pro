@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 
 
+# Explication: Nettoie un nom pour creer une cle Streamlit stable et sans caracteres problematiques.
 def _safe_key(name: str) -> str:
     cleaned = "".join(ch if ch.isalnum() or ch in "_-" else "_" for ch in str(name))
     while "__" in cleaned:
@@ -12,6 +13,7 @@ def _safe_key(name: str) -> str:
     return cleaned.strip("_") or "col"
 
 
+# Explication: Recupere une colonne en serie pandas, ou une serie vide si la colonne est absente.
 def _as_series(df: pd.DataFrame, col: str) -> pd.Series:
     selected = df.loc[:, col]
     if isinstance(selected, pd.DataFrame):
@@ -19,6 +21,7 @@ def _as_series(df: pd.DataFrame, col: str) -> pd.Series:
     return selected
 
 
+# Explication: Convertit une colonne en dates/heures, meme si les formats sont heterogenes.
 def _to_datetime_series(series: pd.Series) -> pd.Series:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", FutureWarning)
@@ -35,6 +38,7 @@ def _to_datetime_series(series: pd.Series) -> pd.Series:
             parsed = parsed.tz_localize(None)
         return pd.Series(parsed, index=series.index)
 
+    # Explication: Convertit une valeur texte en date quand c'est possible.
     def _parse_value(value):
         if pd.isna(value):
             return pd.NaT
@@ -49,6 +53,7 @@ def _to_datetime_series(series: pd.Series) -> pd.Series:
     return series.map(_parse_value)
 
 
+# Explication: Detecte rapidement si une colonne ressemble a des dates.
 def _looks_like_datetime(series: pd.Series) -> bool:
     if pd.api.types.is_datetime64_any_dtype(series):
         return True
@@ -59,6 +64,7 @@ def _looks_like_datetime(series: pd.Series) -> bool:
     return bool((parsed.notna().mean()) >= 0.8)
 
 
+# Explication: Construit un objet qui sauvegarde l'etat actuel des filtres.
 def _build_preset_payload(df: pd.DataFrame, prefix: str, selected_cols: list[str]) -> dict:
     widget_values: dict[str, object] = {}
     for col in selected_cols:
@@ -86,6 +92,7 @@ def _build_preset_payload(df: pd.DataFrame, prefix: str, selected_cols: list[str
     }
 
 
+# Explication: Recharge un preset de filtres dans l'interface utilisateur.
 def _apply_preset(prefix: str, payload: dict, df: pd.DataFrame) -> None:
     selected_cols = [col for col in payload.get("selected_cols", []) if col in df.columns]
     st.session_state[f"{prefix}_enabled"] = True
@@ -96,6 +103,7 @@ def _apply_preset(prefix: str, payload: dict, df: pd.DataFrame) -> None:
         st.session_state[key] = value
 
 
+# Explication: Affiche les filtres globaux et retourne le DataFrame apres filtrage.
 def apply_global_filters(
     df: pd.DataFrame,
     prefix: str = "global_filter",

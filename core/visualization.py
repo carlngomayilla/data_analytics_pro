@@ -8,6 +8,7 @@ import streamlit as st
 
 
 # Layout clair/sombre
+# Explication: Definit les couleurs et le style des graphiques selon le mode clair ou sombre.
 def get_layout(dark_mode: bool = False):
     if dark_mode:
         return dict(
@@ -32,12 +33,14 @@ if "plot_counter" not in st.session_state:
     st.session_state.plot_counter = 0
 
 
+# Explication: Genere une cle unique pour eviter les conflits d'affichage des graphiques Streamlit.
 def get_unique_key(base: str):
     st.session_state.plot_counter += 1
     return f"{base}_{st.session_state.plot_counter}"
 
 
 # Graphiques univaries
+# Explication: Affiche un histogramme pour voir comment les valeurs d'une colonne se repartissent.
 def plot_distribution(df, column, dark_mode=False):
     if column not in df.columns:
         st.warning("Colonne introuvable.")
@@ -63,6 +66,7 @@ def plot_distribution(df, column, dark_mode=False):
     st.plotly_chart(fig, width="stretch", key=get_unique_key(f"dist_{column}"))
 
 
+# Explication: Affiche une boite a moustaches pour visualiser mediane, dispersion et valeurs extremes.
 def plot_box(df, column, by=None, dark_mode=False):
     if column not in df.columns:
         return
@@ -73,6 +77,7 @@ def plot_box(df, column, by=None, dark_mode=False):
     st.plotly_chart(fig, width="stretch", key=get_unique_key(f"box_{column}_{by or 'none'}"))
 
 
+# Explication: Affiche un diagramme en violon pour voir la forme de la distribution.
 def plot_violin(df, column, by=None, dark_mode=False):
     title = f"Diagramme en violon de {column}" + (f" par {by}" if by else "")
     fig = px.violin(df, y=column, x=by, color=by, box=True, points="all", title=title)
@@ -80,6 +85,7 @@ def plot_violin(df, column, by=None, dark_mode=False):
     st.plotly_chart(fig, width="stretch", key=get_unique_key(f"violin_{column}_{by or 'none'}"))
 
 
+# Explication: Affiche une courbe de densite (version lissee) d'une variable numerique.
 def plot_density(df, column, dark_mode=False):
     if column not in df.columns:
         st.warning("Colonne introuvable.")
@@ -96,6 +102,7 @@ def plot_density(df, column, dark_mode=False):
     st.plotly_chart(fig, width="stretch", key=get_unique_key(f"density_{column}"))
 
 
+# Explication: Affiche un diagramme en barres des categories les plus frequentes.
 def plot_bar(df, column, top_n=15, dark_mode=False):
     if column not in df.columns:
         return
@@ -114,6 +121,7 @@ def plot_bar(df, column, top_n=15, dark_mode=False):
     st.plotly_chart(fig, width="stretch", key=get_unique_key(f"bar_{column}"))
 
 
+# Explication: Affiche un camembert pour montrer la repartition des categories.
 def plot_pie(df, column, dark_mode=False):
     if column not in df.columns:
         return
@@ -125,6 +133,7 @@ def plot_pie(df, column, dark_mode=False):
     st.plotly_chart(fig, width="stretch", key=get_unique_key(f"pie_{column}"))
 
 
+# Explication: Affiche un camembert en anneau pour comparer les parts de chaque categorie.
 def plot_donut(df, column, dark_mode=False):
     if column not in df.columns:
         return
@@ -137,6 +146,7 @@ def plot_donut(df, column, dark_mode=False):
     st.plotly_chart(fig, width="stretch", key=get_unique_key(f"donut_{column}"))
 
 
+# Explication: Affiche un nuage de points pour analyser la relation entre deux variables.
 def plot_scatter(df, x_col, y_col, color_col=None, size_col=None, dark_mode=False):
     title = f"{y_col} en fonction de {x_col}"
 
@@ -185,6 +195,7 @@ def plot_scatter(df, x_col, y_col, color_col=None, size_col=None, dark_mode=Fals
 
 
 # Graphiques multivaries
+# Explication: Affiche une matrice de correlation pour identifier les variables liees entre elles.
 def plot_correlation_heatmap(df, dark_mode=False):
     numeric_df = df.select_dtypes(include="number")
     if len(numeric_df.columns) < 2:
@@ -204,6 +215,7 @@ def plot_correlation_heatmap(df, dark_mode=False):
     st.plotly_chart(fig, width="stretch", key=get_unique_key("corr_heatmap"))
 
 
+# Explication: Affiche une matrice de nuages de points pour comparer plusieurs variables numeriques.
 def plot_pairplot(df, dark_mode=False):
     numeric_df = df.select_dtypes(include="number")
     if len(numeric_df.columns) < 2:
@@ -221,6 +233,7 @@ def plot_pairplot(df, dark_mode=False):
     st.plotly_chart(fig, width="stretch", key=get_unique_key("pairplot"))
 
 
+# Explication: Affiche des coordonnees paralleles pour comparer plusieurs mesures en meme temps.
 def plot_parallel_coordinates(df, dark_mode=False):
     numeric_df = df.select_dtypes(include="number")
     if len(numeric_df.columns) < 2:
@@ -236,6 +249,7 @@ def plot_parallel_coordinates(df, dark_mode=False):
     st.plotly_chart(fig, width="stretch", key=get_unique_key("parallel_coordinates"))
 
 
+# Explication: Affiche un graphique radar pour comparer des valeurs sur plusieurs axes.
 def plot_radar_chart(df, categories, values, dark_mode=False):
     fig = go.Figure()
     for i in range(len(df)):
@@ -257,6 +271,7 @@ def plot_radar_chart(df, categories, values, dark_mode=False):
     st.plotly_chart(fig, width="stretch", key=get_unique_key("radar_chart"))
 
 
+# Explication: Affiche une jauge pour suivre une valeur par rapport a une plage ou un objectif.
 def plot_gauge_chart(value, title, dark_mode=False):
     fig = go.Figure(
         go.Indicator(
@@ -274,6 +289,7 @@ def plot_gauge_chart(value, title, dark_mode=False):
     st.plotly_chart(fig, width="stretch", key=get_unique_key("gauge_chart"))
 
 
+# Explication: Affiche un graphique en cascade pour montrer l'effet cumulatif de variations successives.
 def plot_waterfall_chart(values, labels, dark_mode=False):
     fig = go.Figure(
         go.Waterfall(
@@ -290,6 +306,7 @@ def plot_waterfall_chart(values, labels, dark_mode=False):
     st.plotly_chart(fig, width="stretch", key=get_unique_key("waterfall_chart"))
 
 
+# Explication: Affiche une courbe d'evolution d'une mesure selon un axe (souvent le temps).
 def plot_line_evolution(df, x_col, y_col, dark_mode=False):
     if x_col not in df.columns or y_col not in df.columns:
         st.warning("Les colonnes selectionnees sont invalides.")

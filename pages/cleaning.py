@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 
+# Explication: Uniformise les valeurs manquantes pour faciliter le nettoyage.
 def _normalize_missing_values(df: pd.DataFrame) -> pd.DataFrame:
     normalized = df.copy()
     text_cols = normalized.select_dtypes(include=["object", "string"]).columns.tolist()
@@ -14,6 +15,7 @@ def _normalize_missing_values(df: pd.DataFrame) -> pd.DataFrame:
     return normalized
 
 
+# Explication: Cree une signature de la source pour detecter les changements de donnees.
 def _source_signature(df: pd.DataFrame) -> tuple:
     return (
         len(df),
@@ -22,12 +24,14 @@ def _source_signature(df: pd.DataFrame) -> tuple:
     )
 
 
+# Explication: Nettoie un texte pour produire un nom de fichier valide.
 def _safe_filename(name: str, fallback: str = "base_nettoyee") -> str:
     safe = re.sub(r"[^A-Za-z0-9_-]+", "_", (name or "").strip())
     safe = safe.strip("_")
     return safe if safe else fallback
 
 
+# Explication: Convertit un tableau en fichier Excel en memoire (bytes).
 def _to_excel_bytes(df: pd.DataFrame) -> bytes:
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
@@ -36,6 +40,7 @@ def _to_excel_bytes(df: pd.DataFrame) -> bytes:
     return output.getvalue()
 
 
+# Explication: Reinitialise le tableau de travail si la source a change.
 def _reset_working_df_if_needed(df: pd.DataFrame) -> None:
     signature = _source_signature(df)
     if st.session_state.get("cleaning_source_signature") != signature:
@@ -44,14 +49,17 @@ def _reset_working_df_if_needed(df: pd.DataFrame) -> None:
         st.session_state.cleaning_editor_version = st.session_state.get("cleaning_editor_version", 0) + 1
 
 
+# Explication: Incremente la version de l'editeur pour forcer son rafraichissement.
 def _bump_editor_version() -> None:
     st.session_state.cleaning_editor_version = st.session_state.get("cleaning_editor_version", 0) + 1
 
 
+# Explication: Cree un masque booleen qui repere les valeurs manquantes.
 def _missing_mask(df: pd.DataFrame) -> pd.DataFrame:
     return df.isna()
 
 
+# Explication: Restaure les types numeriques apres les operations d'edition.
 def _restore_numeric_types(df: pd.DataFrame, reference_df: pd.DataFrame) -> pd.DataFrame:
     restored = df.copy()
     numeric_cols = reference_df.select_dtypes(include="number").columns.tolist()
@@ -60,6 +68,7 @@ def _restore_numeric_types(df: pd.DataFrame, reference_df: pd.DataFrame) -> pd.D
     return restored
 
 
+# Explication: Orchestre l'ecran: lit les entrees utilisateur puis affiche les resultats.
 def main(df: pd.DataFrame) -> None:
     st.title("Preparation et nettoyage des donnees")
 

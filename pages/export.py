@@ -10,6 +10,7 @@ import plotly.io as pio
 import streamlit as st
 
 
+# Explication: Recupere le moteur HTML compatible WeasyPrint s'il est disponible.
 def _get_weasyprint_html():
     try:
         from weasyprint import HTML
@@ -18,6 +19,7 @@ def _get_weasyprint_html():
     return HTML, None
 
 
+# Explication: Genere les images des graphiques pour le rapport.
 def generate_graph_images(df):
     images = {}
     numeric_cols = df.select_dtypes(include="number").columns.tolist()
@@ -51,6 +53,7 @@ def generate_graph_images(df):
     return images
 
 
+# Explication: Cree un rapport PDF complet a partir des donnees.
 def generate_pdf_report(df):
     HTML, import_error = _get_weasyprint_html()
     if HTML is None:
@@ -97,6 +100,7 @@ def generate_pdf_report(df):
     return pdf_file
 
 
+# Explication: Cree un rapport Excel complet a partir des donnees.
 def generate_excel_report(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
@@ -109,6 +113,7 @@ def generate_excel_report(df):
     return output.getvalue()
 
 
+# Explication: Orchestre l'ecran: lit les entrees utilisateur puis affiche les resultats.
 def main(df):
     st.title("Rapports et exports")
 

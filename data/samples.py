@@ -2,6 +2,7 @@
 import pandas as pd
 import numpy as np
 
+# Explication: Charge un jeu de donnees d'exemple selon le domaine choisi.
 def load_sample(domain_name: str) -> pd.DataFrame:
     if domain_name == "Finance & Comptabilité":
         return pd.DataFrame({

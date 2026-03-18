@@ -39,6 +39,7 @@ except Exception:
 RANDOM_STATE = 42
 
 
+# Explication: Affiche un DataFrame sans erreur de rendu.
 def _safe_dataframe_display(dataframe: pd.DataFrame) -> None:
     try:
         st.dataframe(dataframe, width="stretch")
@@ -50,6 +51,7 @@ def _safe_dataframe_display(dataframe: pd.DataFrame) -> None:
         st.dataframe(dataframe.astype(str), width="stretch")
 
 
+# Explication: Detecte automatiquement s'il s'agit de classification ou de regression.
 def _infer_task(target: pd.Series) -> str:
     non_null = target.dropna()
     if non_null.empty:
@@ -60,6 +62,7 @@ def _infer_task(target: pd.Series) -> str:
     return "Classification"
 
 
+# Explication: Construit le pipeline de pretraitement des variables.
 def _build_preprocessor(x_train: pd.DataFrame) -> ColumnTransformer:
     numeric_cols = x_train.select_dtypes(include="number").columns.tolist()
     categorical_cols = [col for col in x_train.columns if col not in numeric_cols]
@@ -85,6 +88,7 @@ def _build_preprocessor(x_train: pd.DataFrame) -> ColumnTransformer:
     )
 
 
+# Explication: Retourne la liste des modeles disponibles pour le type de tache.
 def _model_options(task: str) -> list[str]:
     if task == "Regression":
         options = [
@@ -106,6 +110,7 @@ def _model_options(task: str) -> list[str]:
     return options
 
 
+# Explication: Construit le modele choisi avec des parametres par defaut.
 def _build_model(task: str, model_name: str):
     if task == "Regression":
         if model_name == "LinearRegression":
@@ -150,6 +155,7 @@ def _build_model(task: str, model_name: str):
     return GradientBoostingClassifier(random_state=RANDOM_STATE)
 
 
+# Explication: Prepare la strategie de validation croisee.
 def _cv_splitter(task: str, y: pd.Series, requested_folds: int):
     max_by_rows = int(len(y))
     if max_by_rows < 2:
@@ -171,6 +177,7 @@ def _cv_splitter(task: str, y: pd.Series, requested_folds: int):
     return KFold(n_splits=n_splits, shuffle=True, random_state=RANDOM_STATE), None
 
 
+# Explication: Execute la validation croisee et calcule les scores.
 def _run_cross_validation(
     pipeline: Pipeline,
     x: pd.DataFrame,
@@ -224,10 +231,12 @@ def _run_cross_validation(
     }
 
 
+# Explication: Verifie si les donnees permettent une stratification.
 def _can_stratify(y: pd.Series) -> bool:
     return y.nunique() > 1 and y.value_counts().min() >= 2
 
 
+# Explication: Calcule les metriques principales pour la regression.
 def _regression_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, float]:
     mse = mean_squared_error(y_true, y_pred)
     rmse = float(np.sqrt(mse))
@@ -247,6 +256,7 @@ def _regression_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, floa
     }
 
 
+# Explication: Calcule les metriques principales pour la classification.
 def _classification_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, float]:
     return {
         "Accuracy": float(accuracy_score(y_true, y_pred)),
@@ -256,6 +266,7 @@ def _classification_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, 
     }
 
 
+# Explication: Extrait l'importance des variables du modele.
 def _feature_importance(
     trained_pipeline: Pipeline,
     top_n: int = 20,
@@ -290,6 +301,7 @@ def _feature_importance(
     return importance_df.head(top_n)
 
 
+# Explication: Affiche les resultats d'apprentissage supervise.
 def _display_supervised_results(result: dict) -> None:
     st.subheader("Resultats du modele")
     st.caption(
@@ -338,6 +350,7 @@ def _display_supervised_results(result: dict) -> None:
         st.plotly_chart(fig_imp, width="stretch")
 
 
+# Explication: Affiche l'onglet dedie aux modeles supervises.
 def _render_supervised_tab(df: pd.DataFrame) -> None:
     st.subheader("Apprentissage supervise")
 
@@ -525,6 +538,7 @@ def _render_supervised_tab(df: pd.DataFrame) -> None:
         _display_supervised_results(result)
 
 
+# Explication: Affiche l'onglet dedie au clustering.
 def _render_clustering_tab(df: pd.DataFrame) -> None:
     st.subheader("Clustering K-Means")
 
@@ -638,6 +652,7 @@ def _render_clustering_tab(df: pd.DataFrame) -> None:
         st.rerun()
 
 
+# Explication: Construit les champs de saisie pour une prediction manuelle.
 def _prediction_input_widget(df: pd.DataFrame, feature: str):
     series = df[feature]
     key_prefix = f"ml_pred_{feature}"
@@ -662,6 +677,7 @@ def _prediction_input_widget(df: pd.DataFrame, feature: str):
     return st.text_input(f"{feature}", value="", key=f"{key_prefix}_txt")
 
 
+# Explication: Affiche l'onglet de prediction sur de nouvelles donnees.
 def _render_prediction_tab(df: pd.DataFrame) -> None:
     st.subheader("Prediction sur nouvelle observation")
 
@@ -733,6 +749,7 @@ def _render_prediction_tab(df: pd.DataFrame) -> None:
             st.caption("Probabilites indisponibles pour ce modele.")
 
 
+# Explication: Orchestre l'ecran: lit les entrees utilisateur puis affiche les resultats.
 def main(df: pd.DataFrame) -> None:
     st.title("Module Machine Learning")
 

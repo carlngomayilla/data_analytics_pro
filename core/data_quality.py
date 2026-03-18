@@ -4,6 +4,7 @@ from typing import Any
 import pandas as pd
 
 
+# Explication: Convertit une colonne en dates/heures, meme si les formats sont heterogenes.
 def _to_datetime_series(series: pd.Series) -> pd.Series:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", FutureWarning)
@@ -20,6 +21,7 @@ def _to_datetime_series(series: pd.Series) -> pd.Series:
             parsed = parsed.tz_localize(None)
         return pd.Series(parsed, index=series.index)
 
+    # Explication: Convertit une valeur texte en date quand c'est possible.
     def _parse_value(value: Any):
         if pd.isna(value):
             return pd.NaT
@@ -34,6 +36,7 @@ def _to_datetime_series(series: pd.Series) -> pd.Series:
     return series.map(_parse_value)
 
 
+# Explication: Identifie les types reels presents dans une colonne declaree en objet.
 def _object_type_names(series: pd.Series) -> list[str]:
     non_null = series.dropna()
     if non_null.empty:
@@ -42,6 +45,7 @@ def _object_type_names(series: pd.Series) -> list[str]:
     return type_names
 
 
+# Explication: Harmonise les types de colonnes (date, nombre, texte) pour faciliter l'analyse.
 def normalize_dataframe_types(
     df: pd.DataFrame,
     numeric_threshold: float = 0.92,

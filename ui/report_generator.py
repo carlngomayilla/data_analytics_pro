@@ -5,6 +5,7 @@ import plotly.io as pio
 import pandas as pd
 import base64
 
+# Explication: Cree un PDF a partir des donnees et des graphiques.
 def generate_pdf(df: pd.DataFrame, figures: list, title: str):
     html = f"<h1>{title}</h1><table>{df.to_html()}</table>"
     for fig in figures:
