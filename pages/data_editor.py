@@ -699,14 +699,27 @@ def main(df: pd.DataFrame) -> None:
         if export_excel_error is not None:
             st.caption(f"Export Excel indisponible: {export_excel_error}")
 
-    max_rows = min(2000, len(matching_df))
+    result_count = int(len(matching_df))
+    if result_count <= 0:
+        st.warning("Aucune ligne disponible pour l'edition avec les filtres actuels.")
+        return
+
+    max_rows = min(2000, result_count)
     default_rows = min(200, max_rows)
+    rows_slider_key = "data_editor_rows_to_edit"
+    previous_rows = st.session_state.get(rows_slider_key, default_rows)
+    try:
+        previous_rows = int(previous_rows)
+    except (TypeError, ValueError):
+        previous_rows = default_rows
+    st.session_state[rows_slider_key] = min(max(1, previous_rows), max_rows)
     rows_to_edit = st.slider(
         "Nombre de lignes a afficher et modifier",
         min_value=1,
         max_value=max_rows,
-        value=default_rows,
+        value=st.session_state[rows_slider_key],
         step=1,
+        key=rows_slider_key,
     )
 
     editable_df = matching_df.head(rows_to_edit).copy()
