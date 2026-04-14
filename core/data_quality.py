@@ -13,10 +13,10 @@ def _parse_datetime_value(value: Any):
         warnings.simplefilter("ignore")
         try:
             ts = pd.to_datetime(value, errors="coerce", format="mixed")
-        except (TypeError, ValueError, OverflowError):
+        except Exception:
             try:
                 ts = pd.to_datetime(value, errors="coerce")
-            except (TypeError, ValueError, OverflowError):
+            except Exception:
                 return pd.NaT
 
     if pd.isna(ts):
@@ -30,10 +30,10 @@ def _parse_datetime_value(value: Any):
     if ts.tzinfo is not None:
         try:
             ts = ts.tz_convert(None)
-        except (TypeError, ValueError):
+        except Exception:
             try:
                 ts = ts.tz_localize(None)
-            except (TypeError, ValueError):
+            except Exception:
                 return pd.NaT
     return ts
 
@@ -44,10 +44,10 @@ def _to_datetime_series(series: pd.Series) -> pd.Series:
         warnings.simplefilter("ignore")
         try:
             parsed = pd.to_datetime(series, errors="coerce", format="mixed")
-        except (TypeError, ValueError, OverflowError):
+        except Exception:
             try:
                 parsed = pd.to_datetime(series, errors="coerce")
-            except (TypeError, ValueError, OverflowError):
+            except Exception:
                 parsed = None
 
     if isinstance(parsed, pd.Series):
@@ -64,7 +64,7 @@ def _to_datetime_series(series: pd.Series) -> pd.Series:
     parsed = series.map(_parse_datetime_value)
     try:
         return pd.to_datetime(parsed, errors="coerce")
-    except (TypeError, ValueError, OverflowError):
+    except Exception:
         return parsed
 
 
