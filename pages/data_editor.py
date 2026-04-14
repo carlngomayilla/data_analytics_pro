@@ -475,8 +475,12 @@ def _count_changed_cells(before_df: pd.DataFrame, after_df: pd.DataFrame) -> tup
     before_view = before_df.loc[common_index, common_cols]
     after_view = after_df.loc[common_index, common_cols]
 
-    changed = before_view.ne(after_view) | (before_view.isna() ^ after_view.isna())
-    changed_cells = int(changed.to_numpy().sum())
+    both_missing = before_view.isna() & after_view.isna()
+    one_missing = before_view.isna() ^ after_view.isna()
+    value_changed = before_view.ne(after_view).fillna(False) & ~both_missing
+    changed = value_changed | one_missing
+    changed = changed.fillna(False).astype(bool)
+    changed_cells = int(changed.to_numpy(dtype=bool).sum())
     changed_rows = int(changed.any(axis=1).sum())
     changed_cols = int(changed.any(axis=0).sum())
     return changed_cells, changed_rows, changed_cols
