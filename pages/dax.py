@@ -410,8 +410,14 @@ def _to_numeric(series: pd.Series) -> pd.Series:
 # Explication: Convertit une serie en dates/heures de maniere robuste.
 def _to_datetime_series(series: pd.Series) -> pd.Series:
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", FutureWarning)
-        parsed = pd.to_datetime(series, errors="coerce")
+        warnings.simplefilter("ignore")
+        try:
+            parsed = pd.to_datetime(series, errors="coerce", format="mixed")
+        except (TypeError, ValueError, OverflowError):
+            try:
+                parsed = pd.to_datetime(series, errors="coerce")
+            except (TypeError, ValueError, OverflowError):
+                parsed = None
 
     if isinstance(parsed, pd.Series) and pd.api.types.is_datetime64_any_dtype(parsed):
         return parsed
@@ -597,7 +603,7 @@ def _compute_powerbi_visual_df(
 
     time_axes = {"__dax_year__", "__dax_month__", "__dax_day__"}
     if axis_col in time_axes:
-        parsed_dates = pd.to_datetime(result[axis_col], errors="coerce")
+        parsed_dates = _to_datetime_series(result[axis_col])
         if parsed_dates.notna().any():
             result["_sort_time"] = parsed_dates
             result = result.sort_values("_sort_time", ascending=True).drop(columns=["_sort_time"])
@@ -725,7 +731,7 @@ def _prepare_visual_dataframe(
 ) -> pd.DataFrame:
     result = grouped_df.copy()
     if chart_type in {"Ligne", "Aire"}:
-        parsed_dates = pd.to_datetime(result[dimension_col], errors="coerce")
+        parsed_dates = _to_datetime_series(result[dimension_col])
         if parsed_dates.notna().any():
             result["_sort_date"] = parsed_dates
             result = result.sort_values("_sort_date", ascending=True).drop(columns=["_sort_date"])
@@ -1405,6 +1411,5 @@ def main(df: pd.DataFrame) -> None:
             if st.button("Reinitialiser le script"):
                 st.session_state.dax_snippets = []
                 st.success("Le script DAX a ete reinitialise.")
-
 
 

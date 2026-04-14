@@ -4,11 +4,51 @@ from typing import Any
 import pandas as pd
 
 
+# Explication: Convertit une valeur isolee en date sans laisser Pandas arreter le chargement.
+def _parse_datetime_value(value: Any):
+    if pd.isna(value):
+        return pd.NaT
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            ts = pd.to_datetime(value, errors="coerce", format="mixed")
+        except (TypeError, ValueError, OverflowError):
+            try:
+                ts = pd.to_datetime(value, errors="coerce")
+            except (TypeError, ValueError, OverflowError):
+                return pd.NaT
+
+    if pd.isna(ts):
+        return pd.NaT
+
+    try:
+        ts = pd.Timestamp(ts)
+    except Exception:
+        return pd.NaT
+
+    if ts.tzinfo is not None:
+        try:
+            ts = ts.tz_convert(None)
+        except (TypeError, ValueError):
+            try:
+                ts = ts.tz_localize(None)
+            except (TypeError, ValueError):
+                return pd.NaT
+    return ts
+
+
 # Explication: Convertit une colonne en dates/heures, meme si les formats sont heterogenes.
 def _to_datetime_series(series: pd.Series) -> pd.Series:
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", FutureWarning)
-        parsed = pd.to_datetime(series, errors="coerce")
+        warnings.simplefilter("ignore")
+        try:
+            parsed = pd.to_datetime(series, errors="coerce", format="mixed")
+        except (TypeError, ValueError, OverflowError):
+            try:
+                parsed = pd.to_datetime(series, errors="coerce")
+            except (TypeError, ValueError, OverflowError):
+                parsed = None
 
     if isinstance(parsed, pd.Series):
         tz_info = getattr(parsed.dtype, "tz", None)
@@ -21,19 +61,11 @@ def _to_datetime_series(series: pd.Series) -> pd.Series:
             parsed = parsed.tz_localize(None)
         return pd.Series(parsed, index=series.index)
 
-    # Explication: Convertit une valeur texte en date quand c'est possible.
-    def _parse_value(value: Any):
-        if pd.isna(value):
-            return pd.NaT
-        try:
-            ts = pd.Timestamp(value)
-        except Exception:
-            return pd.NaT
-        if ts.tzinfo is not None:
-            ts = ts.tz_localize(None)
-        return ts
-
-    return series.map(_parse_value)
+    parsed = series.map(_parse_datetime_value)
+    try:
+        return pd.to_datetime(parsed, errors="coerce")
+    except (TypeError, ValueError, OverflowError):
+        return parsed
 
 
 # Explication: Identifie les types reels presents dans une colonne declaree en objet.
@@ -50,6 +82,7 @@ def normalize_dataframe_types(
     df: pd.DataFrame,
     numeric_threshold: float = 0.92,
     datetime_threshold: float = 0.88,
+    datetime_sample_size: int = 2000,
 ) -> tuple[pd.DataFrame, dict]:
     """
     Normalise les types de colonnes instables (object/string) pour limiter
@@ -82,7 +115,11 @@ def normalize_dataframe_types(
         numeric_candidate = pd.to_numeric(non_empty.str.replace(",", ".", regex=False), errors="coerce")
         numeric_ratio = float(numeric_candidate.notna().mean())
 
-        dt_candidate = _to_datetime_series(non_empty)
+        if len(non_empty) > datetime_sample_size:
+            datetime_probe = non_empty.sample(n=datetime_sample_size, random_state=42)
+        else:
+            datetime_probe = non_empty
+        dt_candidate = _to_datetime_series(datetime_probe)
         datetime_ratio = float(dt_candidate.notna().mean())
 
         converted = False
@@ -116,4 +153,3 @@ def normalize_dataframe_types(
             )
 
     return normalized, report
-

@@ -1,8 +1,10 @@
-# core/data_loader.py
-import os
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import pandas as pd
 import streamlit as st
+
+from config.settings import UPLOAD_FOLDER
 
 
 # Explication: Tente plusieurs encodages pour lire un CSV, meme si le fichier est mal encode.
@@ -27,18 +29,22 @@ def load_data(uploaded_file):
         return None
 
     try:
-        os.makedirs("uploaded_data", exist_ok=True)
-        save_path = os.path.join("uploaded_data", uploaded_file.name)
-        with open(save_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
+        name = Path(uploaded_file.name).name.lower()
+        suffix = Path(name).suffix
+        file_bytes = uploaded_file.getbuffer()
 
-        name = uploaded_file.name.lower()
+        temp_dir = Path(UPLOAD_FOLDER)
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        with NamedTemporaryFile(delete=False, suffix=suffix, dir=temp_dir) as temp_file:
+            temp_file.write(file_bytes)
+            temp_path = Path(temp_file.name)
+
         if name.endswith(".csv"):
-            df = _read_csv_robust(save_path)
+            df = _read_csv_robust(str(temp_path))
         elif name.endswith((".xls", ".xlsx")):
-            df = pd.read_excel(save_path)
+            df = pd.read_excel(temp_path)
         elif name.endswith(".parquet"):
-            df = pd.read_parquet(save_path)
+            df = pd.read_parquet(temp_path)
         else:
             st.error("Format non pris en charge.")
             return None
@@ -47,5 +53,7 @@ def load_data(uploaded_file):
     except Exception as e:
         st.error(f"Erreur lors du chargement: {e}")
         return None
-
+    finally:
+        if "temp_path" in locals() and temp_path.exists():
+            temp_path.unlink(missing_ok=True)
 

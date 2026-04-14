@@ -179,3 +179,15 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Donnees utilisateur et rapports generes par l'application
+uploaded_data/
+rapport_*.pdf
+data/base_nettoyee*.csv
+data/base_nettoyee*.xlsx
+
+# Fragments temporaires de bytecode Python
+*.pyc.*
+
+# Logs locaux de lancement Streamlit
+streamlit.*.log

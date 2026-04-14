@@ -24,8 +24,14 @@ def _as_series(df: pd.DataFrame, col: str) -> pd.Series:
 # Explication: Convertit une colonne en dates/heures, meme si les formats sont heterogenes.
 def _to_datetime_series(series: pd.Series) -> pd.Series:
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", FutureWarning)
-        parsed = pd.to_datetime(series, errors="coerce")
+        warnings.simplefilter("ignore")
+        try:
+            parsed = pd.to_datetime(series, errors="coerce", format="mixed")
+        except (TypeError, ValueError, OverflowError):
+            try:
+                parsed = pd.to_datetime(series, errors="coerce")
+            except (TypeError, ValueError, OverflowError):
+                parsed = None
 
     if isinstance(parsed, pd.Series):
         tz_info = getattr(parsed.dtype, "tz", None)
@@ -287,4 +293,3 @@ def apply_global_filters(
                 st.success(f"Preset enregistre: {name}")
 
     return filtered_df, {"enabled": True, "active_filters": active_filters}
-

@@ -161,16 +161,19 @@ def main(df):
 
     with tab_bi:
         st.subheader("Analyse bivariee")
-        x = st.selectbox("Axe X", all_cols_f, key="bi_x")
-        y = st.selectbox("Axe Y", numeric_cols_f, key="bi_y")
-        color = st.selectbox("Colorer par", ["Aucun"] + categorical_cols_f, key="bi_color")
-        color = None if color == "Aucun" else color
-        size = st.selectbox("Dimension des bulles", ["Aucun"] + numeric_cols_f, key="bi_size")
-        size = None if size == "Aucun" else size
+        if not numeric_cols_f:
+            st.info("Ajoutez au moins une colonne numerique pour activer l'analyse bivariee.")
+        else:
+            x = st.selectbox("Axe X", all_cols_f, key="bi_x")
+            y = st.selectbox("Axe Y", numeric_cols_f, key="bi_y")
+            color = st.selectbox("Colorer par", ["Aucun"] + categorical_cols_f, key="bi_color")
+            color = None if color == "Aucun" else color
+            size = st.selectbox("Dimension des bulles", ["Aucun"] + numeric_cols_f, key="bi_size")
+            size = None if size == "Aucun" else size
 
-        plot_scatter(filtered_df, x, y, color_col=color, size_col=size, dark_mode=dark_mode)
-        interpret_scatter(filtered_df, x, y)
-        plot_line_evolution(filtered_df, x, y, dark_mode=dark_mode)
+            plot_scatter(filtered_df, x, y, color_col=color, size_col=size, dark_mode=dark_mode)
+            interpret_scatter(filtered_df, x, y)
+            plot_line_evolution(filtered_df, x, y, dark_mode=dark_mode)
 
     with tab_multi:
         st.subheader("Analyse multivariee - Relations entre variables")
@@ -216,7 +219,6 @@ def main(df):
                 }
             )
             plot_waterfall_chart(waterfall_data["value"], waterfall_data["label"], dark_mode=dark_mode)
-
 
 
 

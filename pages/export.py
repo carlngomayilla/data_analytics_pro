@@ -1,6 +1,5 @@
 # pages/export.py
 import base64
-import os
 from datetime import datetime
 from io import BytesIO
 
@@ -20,15 +19,22 @@ def _get_weasyprint_html():
 
 
 # Explication: Genere les images des graphiques pour le rapport.
+def _figure_to_base64_png(fig) -> str | None:
+    try:
+        return base64.b64encode(pio.to_image(fig, format="png", width=900, height=600)).decode()
+    except Exception:
+        return None
+
+
 def generate_graph_images(df):
     images = {}
     numeric_cols = df.select_dtypes(include="number").columns.tolist()
 
     if len(numeric_cols) >= 2:
         fig = px.imshow(df[numeric_cols].corr(), text_auto=".2f", color_continuous_scale="RdBu_r")
-        images["correlation"] = base64.b64encode(
-            pio.to_image(fig, format="png", width=900, height=600)
-        ).decode()
+        image = _figure_to_base64_png(fig)
+        if image is not None:
+            images["correlation"] = image
 
         fig = px.scatter(
             df,
@@ -36,24 +42,24 @@ def generate_graph_images(df):
             y=numeric_cols[1],
             title=f"{numeric_cols[1]} vs {numeric_cols[0]}",
         )
-        images["scatter"] = base64.b64encode(
-            pio.to_image(fig, format="png", width=900, height=600)
-        ).decode()
+        image = _figure_to_base64_png(fig)
+        if image is not None:
+            images["scatter"] = image
 
         fig = px.box(df, y=numeric_cols[0], title=f"Boite a moustaches de {numeric_cols[0]}")
-        images["box"] = base64.b64encode(
-            pio.to_image(fig, format="png", width=900, height=600)
-        ).decode()
+        image = _figure_to_base64_png(fig)
+        if image is not None:
+            images["box"] = image
 
         fig = px.histogram(df, x=numeric_cols[0], nbins=50, title=f"Distribution de {numeric_cols[0]}")
-        images["distribution"] = base64.b64encode(
-            pio.to_image(fig, format="png", width=900, height=600)
-        ).decode()
+        image = _figure_to_base64_png(fig)
+        if image is not None:
+            images["distribution"] = image
 
     return images
 
 
-# Explication: Cree un rapport PDF complet a partir des donnees.
+# Explication: Cree un rapport PDF complet en memoire a partir des donnees.
 def generate_pdf_report(df):
     HTML, import_error = _get_weasyprint_html()
     if HTML is None:
@@ -95,9 +101,7 @@ def generate_pdf_report(df):
     </html>
     """
 
-    pdf_file = f"rapport_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
-    HTML(string=html_content).write_pdf(pdf_file)
-    return pdf_file
+    return HTML(string=html_content).write_pdf()
 
 
 # Explication: Cree un rapport Excel complet a partir des donnees.
@@ -136,18 +140,17 @@ def main(df):
         if st.button("Generer le rapport PDF", disabled=not pdf_enabled):
             with st.spinner("Generation du rapport PDF..."):
                 try:
-                    pdf = generate_pdf_report(df)
+                    pdf_bytes = generate_pdf_report(df)
                 except Exception as exc:
                     st.error(f"Echec de generation PDF: {exc}")
-                    pdf = None
-            if pdf:
-                with open(pdf, "rb") as f:
-                    st.download_button(
-                        "Telecharger le rapport PDF",
-                        f,
-                        file_name=os.path.basename(pdf),
-                        mime="application/pdf",
-                    )
+                    pdf_bytes = None
+            if pdf_bytes:
+                st.download_button(
+                    "Telecharger le rapport PDF",
+                    pdf_bytes,
+                    file_name=f"rapport_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                    mime="application/pdf",
+                )
 
     with tab2:
         if st.button("Generer le rapport Excel"):
@@ -159,5 +162,3 @@ def main(df):
                 file_name=f"analyse_{datetime.now().strftime('%Y%m%d')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
-
-

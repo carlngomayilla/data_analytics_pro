@@ -1,5 +1,9 @@
 # ui/sidebar.py
+from pathlib import Path
+
 import streamlit as st
+
+from config.settings import MAX_FILE_SIZE_MB
 
 
 # Explication: Affiche les controles de la barre laterale.
@@ -23,9 +27,11 @@ def render():
         if upload_submitted:
             if uploaded_file is None:
                 st.warning("Selectionnez un fichier avant de lancer le chargement.")
+            elif uploaded_file.size > MAX_FILE_SIZE_MB * 1024 * 1024:
+                st.error(f"Fichier trop volumineux. Limite autorisee: {MAX_FILE_SIZE_MB} Mo.")
             else:
                 uploaded_payload = {
-                    "name": uploaded_file.name,
+                    "name": Path(uploaded_file.name).name,
                     "size": int(uploaded_file.size),
                     "bytes": uploaded_file.getvalue(),
                 }
@@ -59,6 +65,5 @@ def render():
             st.rerun()
 
         return uploaded_payload, upload_submitted
-
 
 

@@ -71,8 +71,14 @@ def _cached_build_search_mask(
 # Explication: Convertit une serie en dates/heures de maniere robuste.
 def _to_datetime_series(series: pd.Series) -> pd.Series:
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", FutureWarning)
-        parsed = pd.to_datetime(series, errors="coerce")
+        warnings.simplefilter("ignore")
+        try:
+            parsed = pd.to_datetime(series, errors="coerce", format="mixed")
+        except (TypeError, ValueError, OverflowError):
+            try:
+                parsed = pd.to_datetime(series, errors="coerce")
+            except (TypeError, ValueError, OverflowError):
+                parsed = None
 
     if isinstance(parsed, pd.Series):
         tz_info = getattr(parsed.dtype, "tz", None)
@@ -405,7 +411,7 @@ def _restore_types(updated_df: pd.DataFrame, reference_df: pd.DataFrame) -> pd.D
 
     datetime_cols = reference_df.select_dtypes(include=["datetime64[ns]", "datetimetz"]).columns.tolist()
     for col in datetime_cols:
-        restored[col] = pd.to_datetime(restored[col], errors="coerce")
+        restored[col] = _to_datetime_series(restored[col])
 
     return restored
 
@@ -730,4 +736,3 @@ def main(df: pd.DataFrame) -> None:
             f"{changed_rows} lignes, {changed_cols} colonnes."
         )
         st.rerun()
-
