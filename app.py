@@ -238,11 +238,11 @@ def _build_data_slide_uri(title: str, color_a: str, color_b: str) -> str:
 # Explication: Affiche l'ecran de presentation de l'application.
 def render_app_presentation() -> None:
     slides = [
-        ("Exploration des donnees", "#0f172a", "#1d4ed8"),
-        ("Nettoyage intelligent", "#1f2937", "#0e7490"),
-        ("Modeles & prediction", "#312e81", "#1d4ed8"),
-        ("Indicateurs DAX", "#134e4a", "#115e59"),
-        ("Recherche & edition", "#374151", "#111827"),
+        ("Exploration des donnees", "#111411", "#0f766e"),
+        ("Nettoyage intelligent", "#181b17", "#b45309"),
+        ("Modeles & prediction", "#111411", "#be123c"),
+        ("Indicateurs DAX", "#151a15", "#3f6212"),
+        ("Recherche & edition", "#181b17", "#0e7490"),
     ]
     cards = [
         {
@@ -270,7 +270,7 @@ def render_app_presentation() -> None:
             width: 100%;
             margin-top: 0.25rem;
             margin-bottom: 1rem;
-            border-radius: 16px;
+            border-radius: 8px;
           }}
           .nexus-carousel-track {{
             display: flex;
@@ -281,9 +281,9 @@ def render_app_presentation() -> None:
           .nexus-slide {{
             width: 330px;
             flex: 0 0 auto;
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.16);
-            border-radius: 16px;
+            background: var(--nexus-surface);
+            border: 1px solid var(--nexus-border);
+            border-radius: 8px;
             overflow: hidden;
           }}
           .nexus-slide img {{
@@ -321,120 +321,64 @@ def render_app_presentation() -> None:
         unsafe_allow_html=True,
     )
 
-    st.markdown("## NEXUS DATA ANALYTICS PRO")
-    st.markdown("### Engineering Intelligence. Empowering Decisions.")
-    st.markdown("Une nouvelle generation de plateforme analytique.")
-
     st.markdown(
         """
-Dans un environnement ou la donnee est devenue un actif strategique, **Nexus Data Analytics Pro** offre une infrastructure analytique complete permettant de transformer des volumes complexes d'informations en decisions claires, mesurables et performantes.
+        <div class="nexus-hero">
+          <div class="nexus-eyebrow">Nexus Data Analytics Pro</div>
+          <h2>Analyse, preparation, prediction et reporting dans un espace unique.</h2>
+          <p>
+            Chargez vos donnees, controlez leur qualite, explorez les tendances,
+            entrainez des modeles et produisez des livrables clairs pour la decision.
+          </p>
+        </div>
 
-Concue par **M. NGOMAYILLA NDEMA Christopher**, responsable du groupe **NEXUS**, la plateforme allie rigueur scientifique, intelligence artificielle et excellence technologique.
+        <div class="nexus-kpi-row">
+          <div class="nexus-kpi">
+            <strong>01. Charger</strong>
+            <span>CSV, Excel et Parquet avec typage robuste et controle de taille.</span>
+          </div>
+          <div class="nexus-kpi">
+            <strong>02. Nettoyer</strong>
+            <span>Valeurs manquantes, doublons, corrections manuelles et export propre.</span>
+          </div>
+          <div class="nexus-kpi">
+            <strong>03. Analyser</strong>
+            <span>Statistiques, correlations, filtres globaux et visualisations interactives.</span>
+          </div>
+          <div class="nexus-kpi">
+            <strong>04. Livrer</strong>
+            <span>Rapports Excel, PDF, scripts DAX et vues exploitables.</span>
+          </div>
+        </div>
 
- **Une plateforme. Une vision. Une maitrise totale de la donnee.**
-
-Nexus Data Analytics Pro n'est pas un simple outil d'analyse.
-
-C'est un environnement integre qui couvre l'ensemble du cycle de vie des donnees:
-
-- Acquisition
-- Preparation
-- Modelisation
-- Analyse avancee
-- Intelligence predictive
-- Reporting strategique
-
-## Architecture Modulaire Haute Performance
-
-### Executive Dashboard
-Visualisation instantanee des indicateurs cles.
-
-- Statistiques descriptives automatisees
-- Analyse de qualite des donnees
-- Correlations intelligentes
-- Exports professionnels
-
-Une vue decisionnelle immediate.
-
-### Advanced Analytics Engine
-Puissance statistique integree.
-
-- Analyses univariees, bivariees, multivariees
-- Visualisations interactives dynamiques
-- Exploration correlationnelle avancee
-
-Comprendre les relations invisibles dans vos donnees.
-
-### Data Engineering Suite
-Maitrise totale de la qualite des donnees.
-
-- Detection intelligente des incoherences
-- Traitement avance des valeurs manquantes
-- Typage automatique securise
-- Journalisation complete des modifications
-
-Des donnees fiables. Des analyses solides.
-
-### Artificial Intelligence & Machine Learning
-Intelligence integree a votre strategie.
-
-- Modeles supervises (classification, regression)
-- Modeles non supervises (clustering, segmentation)
-- Evaluation metrique complete
-- Visualisation interpretable des performances
-
-Passez de l'analyse descriptive a la prediction strategique.
-
-### Business Intelligence & DAX Modeling
-Pont direct vers l'ecosysteme BI.
-
-- Generation automatisee de mesures DAX
-- Bibliotheque de modeles analytiques
-- Simulation logique type Power BI
-- Export de scripts prets a deployer
-
-Un moteur BI integre a votre workflow Python.
-
-### Smart Data Control
-Edition securisee et tracable.
-
-- Filtres simples et croises
-- Modification controlee des enregistrements
-- Systeme Undo / Redo
-- Historique complet des actions
-
-Un controle absolu, sans perte d'integrite.
-
-### Professional Reporting
-Communication analytique optimisee.
-
-- Rapports PDF premium
-- Export Excel structure
-- Dossiers analytiques prets a presentation
-
-Transformez vos analyses en livrables executifs.
-
-## Positionnement Strategique
-
-Nexus Data Analytics Pro s'adresse a:
-
-- Organisations publiques et privees
-- Cabinets financiers et comptables
-- Data analysts et data scientists
-- Centres de recherche
-- Universites et ecoles specialisees
-
-## Philosophie
-
-Rigueur scientifique.  
-Clarte decisionnelle.  
-Automatisation intelligente.  
-Securite des donnees.
-
-## Notre ambition
-
-Creer une plateforme capable de rivaliser avec les standards internationaux en matiere d'analyse decisionnelle, tout en restant accessible, modulaire et evolutive.
-        """
+        <div class="nexus-feature-grid">
+          <div class="nexus-feature">
+            <strong>Tableau de bord</strong>
+            <span>KPI, qualite des donnees, statistiques descriptives et exports de tableaux.</span>
+          </div>
+          <div class="nexus-feature">
+            <strong>Analyses avancees</strong>
+            <span>Univarie, bivarie, multivarie, radar, jauge et evolution temporelle.</span>
+          </div>
+          <div class="nexus-feature">
+            <strong>Machine learning</strong>
+            <span>Classification, regression, clustering, validation croisee et prediction.</span>
+          </div>
+          <div class="nexus-feature">
+            <strong>DAX & BI</strong>
+            <span>Mesures DAX, contexte de filtre, Top N, time intelligence et exports.</span>
+          </div>
+          <div class="nexus-feature">
+            <strong>Edition controlee</strong>
+            <span>Recherche, filtres croises, modification, undo, redo et journal d'actions.</span>
+          </div>
+          <div class="nexus-feature">
+            <strong>Reporting</strong>
+            <span>Exports propres pour partager les resultats sans retraitement manuel.</span>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
 

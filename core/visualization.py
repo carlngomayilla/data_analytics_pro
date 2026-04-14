@@ -7,24 +7,30 @@ import plotly.graph_objects as go
 import streamlit as st
 
 
+COLORWAY = ["#0f766e", "#b45309", "#be123c", "#3f6212", "#0e7490", "#a16207"]
+COLORWAY_DARK = ["#2dd4bf", "#f59e0b", "#fb7185", "#84cc16", "#22d3ee", "#facc15"]
+
+
 # Layout clair/sombre
 # Explication: Definit les couleurs et le style des graphiques selon le mode clair ou sombre.
 def get_layout(dark_mode: bool = False):
     if dark_mode:
         return dict(
-            paper_bgcolor="#0e1117",
-            plot_bgcolor="#262730",
-            font=dict(color="#fafafa"),
-            title_font=dict(color="#fafafa"),
+            paper_bgcolor="#181b17",
+            plot_bgcolor="#131712",
+            font=dict(color="#f3f6ef"),
+            title_font=dict(color="#f3f6ef"),
             template="plotly_dark",
+            colorway=COLORWAY_DARK,
         )
 
     return dict(
-        paper_bgcolor="white",
-        plot_bgcolor="#f8f9fa",
-        font=dict(color="#000000"),
-        title_font=dict(color="#000000"),
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#f5f7f4",
+        font=dict(color="#161a16"),
+        title_font=dict(color="#161a16"),
         template="plotly_white",
+        colorway=COLORWAY,
     )
 
 
@@ -59,7 +65,7 @@ def plot_distribution(df, column, dark_mode=False):
         marginal="violin",
         histnorm="probability density",
         title=title,
-        color_discrete_sequence=["#636EFA"] if not dark_mode else ["#8b5cf6"],
+        color_discrete_sequence=[COLORWAY_DARK[0] if dark_mode else COLORWAY[0]],
         opacity=0.7,
     )
     fig.update_layout(bargap=0.1, height=600, **get_layout(dark_mode))
@@ -115,7 +121,7 @@ def plot_bar(df, column, top_n=15, dark_mode=False):
         title=title,
         labels={"x": column, "y": "Frequence"},
         color=counts.values,
-        color_continuous_scale="Viridis" if not dark_mode else "plasma",
+        color_continuous_scale=["#f5f7f4", "#0f766e"] if not dark_mode else ["#131712", "#2dd4bf"],
     )
     fig.update_layout(height=600, **get_layout(dark_mode))
     st.plotly_chart(fig, width="stretch", key=get_unique_key(f"bar_{column}"))
@@ -183,7 +189,7 @@ def plot_scatter(df, x_col, y_col, color_col=None, size_col=None, dark_mode=Fals
         opacity=0.7,
     )
 
-    line_color = "white" if dark_mode else "DarkSlateGrey"
+    line_color = "#f3f6ef" if dark_mode else "#303a31"
     fig.update_traces(marker=dict(line=dict(width=1, color=line_color)))
     fig.update_layout(height=600, **get_layout(dark_mode))
 
@@ -281,7 +287,7 @@ def plot_gauge_chart(value, title, dark_mode=False):
             title={"text": title},
             gauge={
                 "axis": {"range": [0, 100]},
-                "bar": {"color": "darkblue" if not dark_mode else "cyan"},
+                "bar": {"color": COLORWAY_DARK[0] if dark_mode else COLORWAY[0]},
             },
         )
     )
@@ -317,20 +323,20 @@ def plot_line_evolution(df, x_col, y_col, dark_mode=False):
         st.info("Aucune donnee disponible pour l'evolution temporelle.")
         return
 
-    template = "plotly_dark" if dark_mode else "plotly_white"
     fig = px.line(
         data,
         x=x_col,
         y=y_col,
         markers=True,
         title=f"Evolution de {y_col} en fonction de {x_col}",
-        template=template,
+        color_discrete_sequence=[COLORWAY_DARK[0] if dark_mode else COLORWAY[0]],
     )
 
     fig.update_layout(
         xaxis_title=x_col,
         yaxis_title=y_col,
         hovermode="x unified",
+        **get_layout(dark_mode),
     )
 
     st.plotly_chart(fig, width="stretch")
